@@ -710,8 +710,9 @@ async function renderTree() {
       <div class="node-label" title="${esc(cap.name)}">${esc(cap.name)}</div>
       <div class="node-memo${cap.memo ? ' has-memo' : ''}">${cap.memo ? esc(cap.memo) : ''}</div>`;
 
+    let treeCachedDataUrl = null;
     ipcRenderer.invoke('pm-read-image', cap.filePath).then(url => {
-      if (url) node.querySelector('img').src = url;
+      if (url) { node.querySelector('img').src = url; treeCachedDataUrl = url; }
     });
 
     // ドラッグ移動（グローバルリスナーに委譲）
@@ -721,6 +722,13 @@ async function renderTree() {
       const pos = treeData.nodes[cap.id];
       treeDrag = { capId: cap.id, startX: e.clientX, startY: e.clientY, nodeStartX: pos.x, nodeStartY: pos.y, nodeEl: node };
       e.preventDefault();
+    });
+
+    // ダブルクリック → プレビュー
+    node.addEventListener('dblclick', e => {
+      if (connectMode) return;
+      e.stopPropagation();
+      showPreview(cap, treeCachedDataUrl);
     });
 
     // 接続モード クリック
@@ -1080,18 +1088,10 @@ function renderCaptures(captures) {
       updateCounts();
     });
 
-    // シングルクリック → プレビュー、ダブルクリック → エディタ
-    let clickTimer = null;
-    card.addEventListener('click', () => {
-      if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; return; }
-      clickTimer = setTimeout(() => {
-        clickTimer = null;
-        showPreview(cap, cachedDataUrl);
-      }, 220);
-    });
-    card.addEventListener('dblclick', () => {
-      if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
-      ipcRenderer.send('pm-open-in-editor', cap.filePath);
+    // ダブルクリック → プレビュー
+    card.addEventListener('dblclick', e => {
+      if (e.target.closest('.card-actions')) return;
+      showPreview(cap, cachedDataUrl);
     });
 
     grid.appendChild(card);
