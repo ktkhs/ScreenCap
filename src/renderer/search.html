@@ -179,6 +179,7 @@ body {
   <span class="filter-chip" data-filter="name">キャプチャ名</span>
   <span class="filter-chip" data-filter="memo">メモ</span>
   <span class="filter-chip" data-filter="project">プロジェクト名</span>
+  <span class="filter-chip" data-filter="ocr">画像テキスト</span>
 </div>
 
 <div id="results"></div>
@@ -235,7 +236,8 @@ function filterAndRender() {
     if (currentFilter === 'name')    return matchField(r.capName, query);
     if (currentFilter === 'memo')    return matchField(r.memo, query);
     if (currentFilter === 'project') return matchField(r.projectName, query);
-    return matchField(r.capName, query) || matchField(r.memo, query) || matchField(r.projectName, query);
+    if (currentFilter === 'ocr')     return matchField(r.ocrText, query);
+    return matchField(r.capName, query) || matchField(r.memo, query) || matchField(r.projectName, query) || matchField(r.ocrText, query);
   });
 
   countEl.textContent = filtered.length ? `${filtered.length} 件` : '';

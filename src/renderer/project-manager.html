@@ -321,6 +321,17 @@ body {
   white-space: nowrap;
   max-width: 100%;
 }
+.ocr-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  color: #6c7086;
+  margin-top: 2px;
+}
+.ocr-badge.done { color: #89b4fa; }
+@keyframes ocr-spin { to { transform: rotate(360deg); } }
+.ocr-badge .spin { animation: ocr-spin 1s linear infinite; display: inline-block; }
 
 #empty-state {
   flex: 1;
@@ -1206,6 +1217,9 @@ function renderCaptures(captures) {
         <div class="cap-name" title="${esc(cap.name)}">${esc(cap.name)}</div>
         <div class="cap-date">${date}</div>
         ${cap.memo ? `<div class="cap-memo-badge" title="${esc(cap.memo)}">${IC.memo} ${esc(cap.memo)}</div>` : ''}
+        ${cap.ocrText
+          ? `<div class="ocr-badge done" title="${esc(cap.ocrText)}"><svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3,8 7,12 13,4"/></svg> OCR</div>`
+          : `<div class="ocr-badge" data-ocr-pending="${cap.id}"><span class="spin">◌</span> OCR解析中…</div>`}
       </div>
       <div class="card-actions">
         <button class="card-action-btn" data-action="memo" title="メモ">${IC.memo}</button>
@@ -1396,6 +1410,21 @@ document.getElementById('ctx-delete').addEventListener('click', async () => {
 ipcRenderer.on('pm-refresh', async () => {
   await loadCaptures();
   updateCounts();
+});
+
+ipcRenderer.on('pm-ocr-complete', (e, { pid, cid, ocrText }) => {
+  // treeCaptures のメタデータを更新
+  const cap = treeCaptures.find(c => c.id === cid);
+  if (cap) cap.ocrText = ocrText;
+
+  // カードのバッジを更新
+  const badge = document.querySelector(`.ocr-badge[data-ocr-pending="${cid}"]`);
+  if (badge) {
+    badge.classList.add('done');
+    badge.removeAttribute('data-ocr-pending');
+    badge.title = ocrText;
+    badge.innerHTML = `<svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3,8 7,12 13,4"/></svg> OCR`;
+  }
 });
 
 function esc(s) {

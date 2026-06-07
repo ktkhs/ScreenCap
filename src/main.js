@@ -4,7 +4,7 @@ const fs = require('fs');
 require('@electron/remote/main').initialize();
 
 // ---- インメモリ検索インデックス ----
-// Map<cap_id, {project_id, project_name, cap_name, memo, filename, created_at}>
+// Map<cap_id, {project_id, project_name, cap_name, memo, ocr_text, filename, created_at}>
 const searchIndex = new Map();
 
 function dbUpsert(row) {
@@ -37,6 +37,11 @@ function dbUpdateProjectName(pid, name) {
   }
 }
 
+function dbUpdateOcrText(cid, ocrText) {
+  const row = searchIndex.get(cid);
+  if (row) row.ocr_text = ocrText;
+}
+
 function dbSearch(query) {
   const q = query.toLowerCase();
   const results = [];
@@ -44,7 +49,8 @@ function dbSearch(query) {
     if (
       row.cap_name.toLowerCase().includes(q) ||
       row.memo.toLowerCase().includes(q) ||
-      row.project_name.toLowerCase().includes(q)
+      row.project_name.toLowerCase().includes(q) ||
+      (row.ocr_text || '').toLowerCase().includes(q)
     ) results.push(row);
   }
   results.sort((a, b) => (b.created_at > a.created_at ? 1 : -1));
@@ -60,6 +66,7 @@ async function rebuildIndex() {
       searchIndex.set(cap.id, {
         cap_id: cap.id, project_id: proj.id, project_name: proj.name,
         cap_name: cap.name || '', memo: cap.memo || '',
+        ocr_text: cap.ocrText || '',
         filename: cap.filename || '', created_at: cap.createdAt || '',
       });
     }
@@ -71,6 +78,58 @@ let mainWindow = null;
 let tray = null;
 let searchWindow = null;
 let selectorWindows = [];
+
+// ---- OCR エンジン ----
+let ocrWorker = null;
+const ocrQueue = [];   // [{pid, cid, filePath}]
+let ocrRunning = false;
+
+async function initOcr() {
+  const { createWorker } = require('tesseract.js');
+  const tessDataPath = path.join(app.getPath('userData'), 'tessdata');
+  await fs.promises.mkdir(tessDataPath, { recursive: true });
+  ocrWorker = await createWorker('jpn+eng', 1, {
+    langPath: tessDataPath,
+    cachePath: tessDataPath,
+    logger: () => {},   // ログ抑制
+  });
+  console.log('[ScreenCap] OCR worker ready');
+  processOcrQueue();   // キューに積まれた未処理分を開始
+}
+
+function enqueueOcr(pid, cid, filePath) {
+  ocrQueue.push({ pid, cid, filePath });
+  processOcrQueue();
+}
+
+async function processOcrQueue() {
+  if (ocrRunning || !ocrWorker || ocrQueue.length === 0) return;
+  ocrRunning = true;
+  while (ocrQueue.length > 0) {
+    const { pid, cid, filePath } = ocrQueue.shift();
+    try {
+      const { data: { text } } = await ocrWorker.recognize(filePath);
+      const ocrText = text.replace(/\s+/g, ' ').trim();
+
+      // captures.json に保存
+      const list = await loadCaptures(pid);
+      const cap = list.find(c => c.id === cid);
+      if (cap) {
+        cap.ocrText = ocrText;
+        await saveCaptures(pid, list);
+        dbUpdateOcrText(cid, ocrText);
+      }
+
+      // プロジェクト管理画面に通知
+      if (projectManagerWindow && !projectManagerWindow.isDestroyed()) {
+        projectManagerWindow.webContents.send('pm-ocr-complete', { pid, cid, ocrText });
+      }
+    } catch (e) {
+      console.error('[ScreenCap] OCR error:', e.message);
+    }
+  }
+  ocrRunning = false;
+}
 let editorWindow = null;
 let selectionStart = null;
 let preCaptured = {};       // { displayId: nativeImage } セレクター表示前にキャッシュ
@@ -433,10 +492,12 @@ ipcMain.handle('pm-save-capture', async (e, { pid, dataUrl, name }) => {
   await fs.promises.writeFile(path.join(projectDir(pid), filename), buf);
   list.push({ id, name: capName, filename, createdAt });
   await saveCaptures(pid, list);
-  dbUpsert({ cap_id: id, project_id: pid, project_name: proj ? proj.name : '', cap_name: capName, memo: '', filename, created_at: createdAt });
+  dbUpsert({ cap_id: id, project_id: pid, project_name: proj ? proj.name : '', cap_name: capName, memo: '', ocr_text: '', filename, created_at: createdAt });
   if (projectManagerWindow && !projectManagerWindow.isDestroyed()) {
     projectManagerWindow.webContents.send('pm-refresh');
   }
+  // バックグラウンドでOCR
+  enqueueOcr(pid, id, path.join(projectDir(pid), filename));
   return id;
 });
 
@@ -572,12 +633,18 @@ ipcMain.handle('pm-import-project', async () => {
     await saveCaptures(newId, captures);
     await saveTree(newId, tree);
 
-    // 検索インデックスに追加
-    captures.forEach(cap => dbUpsert({
-      cap_id: cap.id, project_id: newId, project_name: projMeta.name,
-      cap_name: cap.name || '', memo: cap.memo || '',
-      filename: cap.filename || '', created_at: cap.createdAt || '',
-    }));
+    // 検索インデックスに追加・OCRキューへ
+    captures.forEach(cap => {
+      dbUpsert({
+        cap_id: cap.id, project_id: newId, project_name: projMeta.name,
+        cap_name: cap.name || '', memo: cap.memo || '',
+        ocr_text: cap.ocrText || '',
+        filename: cap.filename || '', created_at: cap.createdAt || '',
+      });
+      if (!cap.ocrText) {
+        enqueueOcr(newId, cap.id, path.join(projectDir(newId), cap.filename));
+      }
+    });
 
     return { ok: true, id: newId, name: projMeta.name };
   } catch (err) {
@@ -621,6 +688,7 @@ ipcMain.handle('search-captures', (e, query) => {
     capId:       row.cap_id,
     capName:     row.cap_name,
     memo:        row.memo,
+    ocrText:     row.ocr_text || '',
     createdAt:   row.created_at,
     filePath:    path.join(projectDir(row.project_id), row.filename),
   }));
@@ -768,6 +836,7 @@ app.whenReady().then(async () => {
   dataDir = path.join(app.getPath('userData'), 'screencap');
   fs.mkdirSync(dataDir, { recursive: true });
   await rebuildIndex();
+  initOcr().catch(e => console.error('[ScreenCap] OCR init failed:', e.message));
   createMainWindow();
   createTray();
   registerHotkeys();
