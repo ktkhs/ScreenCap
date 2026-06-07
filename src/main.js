@@ -116,7 +116,6 @@ async function initOcr() {
   const tessDataPath = path.join(app.getPath('userData'), 'tessdata');
   await fs.promises.mkdir(tessDataPath, { recursive: true });
   ocrWorker = await createWorker('jpn+eng', 1, {
-    langPath: tessDataPath,
     cachePath: tessDataPath,
     logger: () => {},   // ログ抑制
   });
