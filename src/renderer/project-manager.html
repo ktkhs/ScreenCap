@@ -477,7 +477,10 @@ body {
 <div id="sidebar">
   <div id="sidebar-header">
     <span><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><path d="M1 4a1 1 0 011-1h4l2 2h6a1 1 0 011 1v7a1 1 0 01-1 1H2a1 1 0 01-1-1V4z"/></svg> プロジェクト</span>
-    <button id="btn-new-project" title="新規プロジェクト"><svg width="14" height="14" viewBox="0 0 16 16" stroke="white" stroke-width="2.5" stroke-linecap="round" style="vertical-align:middle"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg></button>
+    <div style="display:flex;gap:4px">
+      <button id="btn-import-project" title="インポート"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><path d="M8 2v8"/><path d="M5 7l3 3 3-3"/><path d="M2 12h12"/></svg></button>
+      <button id="btn-new-project" title="新規プロジェクト"><svg width="14" height="14" viewBox="0 0 16 16" stroke="white" stroke-width="2.5" stroke-linecap="round" style="vertical-align:middle"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg></button>
+    </div>
   </div>
   <div id="project-list"></div>
 </div>
@@ -491,6 +494,7 @@ body {
     </div>
     <button class="connect-btn" id="btn-connect-mode" style="display:none"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><path d="M6.5 9.5a3 3 0 004.2 0l2-2a3 3 0 00-4.2-4.2L7 4.8"/><path d="M9.5 6.5a3 3 0 00-4.2 0L3 8.5a3 3 0 004.2 4.2l1.5-1.5"/></svg> 接続</button>
     <button class="connect-btn" id="btn-arrange" style="display:none"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><rect x="1" y="2" width="5" height="5" rx="1"/><rect x="10" y="2" width="5" height="5" rx="1"/><rect x="1" y="9" width="5" height="5" rx="1"/><rect x="10" y="9" width="5" height="5" rx="1"/></svg> 整列</button>
+    <button class="header-btn" id="btn-export-project" style="display:none"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><path d="M8 10V2"/><path d="M5 5l3-3 3 3"/><path d="M2 12h12"/><path d="M4 12v2h8v-2"/></svg> エクスポート</button>
     <button class="header-btn" id="btn-rename-project" style="display:none">名前を変更</button>
     <button class="header-btn danger" id="btn-delete-project" style="display:none">削除</button>
   </div>
@@ -1067,6 +1071,7 @@ async function selectProject(id) {
   document.getElementById('panel-title').textContent = p ? p.name : '';
   document.getElementById('panel-title').style.color = '';
   document.getElementById('view-toggle').style.display = '';
+  document.getElementById('btn-export-project').style.display = '';
   document.getElementById('btn-rename-project').style.display = '';
   document.getElementById('btn-delete-project').style.display = '';
   document.getElementById('btn-connect-mode').style.display = currentView === 'tree' ? '' : 'none';
@@ -1244,6 +1249,25 @@ document.getElementById('btn-new-project').addEventListener('click', async () =>
   selectProject(id);
 });
 
+// ---- Export / Import ----
+document.getElementById('btn-export-project').addEventListener('click', async () => {
+  if (!currentProjectId) return;
+  const result = await ipcRenderer.invoke('pm-export-project', currentProjectId);
+  if (result.canceled) return;
+  if (!result.ok) { alert('エクスポートに失敗しました: ' + result.error); return; }
+  const { shell } = require('electron');
+  shell.showItemInFolder(result.destDir);
+});
+
+document.getElementById('btn-import-project').addEventListener('click', async () => {
+  const result = await ipcRenderer.invoke('pm-import-project');
+  if (result.canceled) return;
+  if (!result.ok) { alert('インポートに失敗しました: ' + result.error); return; }
+  projects = await ipcRenderer.invoke('pm-get-projects');
+  renderProjects();
+  selectProject(result.id);
+});
+
 // ---- Rename / Delete project ----
 document.getElementById('btn-rename-project').addEventListener('click', () => renameCurrentProject());
 document.getElementById('btn-delete-project').addEventListener('click', () => deleteCurrentProject());
@@ -1272,6 +1296,7 @@ async function deleteCurrentProject() {
   document.getElementById('panel-title').style.color = '#6c7086';
   document.getElementById('view-toggle').style.display = 'none';
   document.getElementById('btn-connect-mode').style.display = 'none';
+  document.getElementById('btn-export-project').style.display = 'none';
   document.getElementById('btn-rename-project').style.display = 'none';
   document.getElementById('btn-delete-project').style.display = 'none';
   document.getElementById('capture-grid').innerHTML = '';
@@ -1324,6 +1349,7 @@ document.getElementById('ctx-delete').addEventListener('click', async () => {
     document.getElementById('panel-title').style.color = '#6c7086';
     document.getElementById('view-toggle').style.display = 'none';
     document.getElementById('btn-connect-mode').style.display = 'none';
+    document.getElementById('btn-export-project').style.display = 'none';
     document.getElementById('btn-rename-project').style.display = 'none';
     document.getElementById('btn-delete-project').style.display = 'none';
     document.getElementById('empty-state').style.display = 'flex';

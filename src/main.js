@@ -386,6 +386,109 @@ async function saveTree(pid, data) {
 ipcMain.handle('pm-get-tree', async (e, pid) => loadTree(pid));
 ipcMain.handle('pm-save-tree', async (e, { pid, data }) => saveTree(pid, data));
 
+// ---- Export ----
+ipcMain.handle('pm-export-project', async (e, pid) => {
+  const projects = await loadProjects();
+  const proj = projects.find(p => p.id === pid);
+  if (!proj) return { ok: false, error: 'プロジェクトが見つかりません' };
+
+  const { filePath: destDir, canceled } = await dialog.showSaveDialog({
+    title: 'エクスポート先を選択',
+    defaultPath: proj.name,
+    buttonLabel: 'エクスポート',
+    properties: ['createDirectory'],
+  });
+  if (canceled || !destDir) return { ok: false, canceled: true };
+
+  try {
+    await fs.promises.mkdir(destDir, { recursive: true });
+
+    // project.json
+    await fs.promises.writeFile(
+      path.join(destDir, 'project.json'),
+      JSON.stringify({ name: proj.name, createdAt: proj.createdAt, exportedAt: new Date().toISOString() }, null, 2)
+    );
+
+    // captures.json（filePath は含めない）
+    const captures = await loadCaptures(pid);
+    await fs.promises.writeFile(
+      path.join(destDir, 'captures.json'),
+      JSON.stringify(captures, null, 2)
+    );
+
+    // tree.json
+    const tree = await loadTree(pid);
+    await fs.promises.writeFile(
+      path.join(destDir, 'tree.json'),
+      JSON.stringify(tree, null, 2)
+    );
+
+    // 画像ファイルをコピー
+    await Promise.all(captures.map(async cap => {
+      const src = path.join(projectDir(pid), cap.filename);
+      try { await fs.promises.copyFile(src, path.join(destDir, cap.filename)); } catch {}
+    }));
+
+    return { ok: true, destDir };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+});
+
+// ---- Import ----
+ipcMain.handle('pm-import-project', async () => {
+  const { filePaths, canceled } = await dialog.showOpenDialog({
+    title: 'エクスポートフォルダを選択',
+    buttonLabel: 'インポート',
+    properties: ['openDirectory'],
+  });
+  if (canceled || !filePaths.length) return { ok: false, canceled: true };
+
+  const srcDir = filePaths[0];
+  try {
+    // project.json 読み込み
+    let projMeta;
+    try {
+      projMeta = JSON.parse(await fs.promises.readFile(path.join(srcDir, 'project.json'), 'utf8'));
+    } catch {
+      return { ok: false, error: 'project.json が見つかりません。エクスポートフォルダを選択してください。' };
+    }
+
+    // captures.json 読み込み
+    let captures = [];
+    try {
+      captures = JSON.parse(await fs.promises.readFile(path.join(srcDir, 'captures.json'), 'utf8'));
+    } catch {}
+
+    // tree.json 読み込み
+    let tree = { nodes: {}, edges: [] };
+    try {
+      tree = JSON.parse(await fs.promises.readFile(path.join(srcDir, 'tree.json'), 'utf8'));
+    } catch {}
+
+    // 新しいプロジェクトを作成
+    const projects = await loadProjects();
+    const newId = `proj_${Date.now()}`;
+    projects.push({ id: newId, name: projMeta.name, createdAt: projMeta.createdAt || new Date().toISOString() });
+    await saveProjectsMeta(projects);
+    await fs.promises.mkdir(projectDir(newId), { recursive: true });
+
+    // 画像をコピー
+    await Promise.all(captures.map(async cap => {
+      const src = path.join(srcDir, cap.filename);
+      try { await fs.promises.copyFile(src, path.join(projectDir(newId), cap.filename)); } catch {}
+    }));
+
+    // captures.json と tree.json を書き込み
+    await saveCaptures(newId, captures);
+    await saveTree(newId, tree);
+
+    return { ok: true, id: newId, name: projMeta.name };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+});
+
 ipcMain.handle('pm-read-image', async (e, filePath) => {
   try {
     const buf = await fs.promises.readFile(filePath);
