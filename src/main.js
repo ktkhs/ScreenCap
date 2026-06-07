@@ -44,9 +44,13 @@ function createMainWindow() {
 }
 
 function registerHotkeys() {
-  globalShortcut.register('CommandOrControl+Alt+S', () => startAreaCapture());
+  globalShortcut.register('CommandOrControl+Shift+1', () => startAreaCapture());
   globalShortcut.register('CommandOrControl+Alt+W', () => {
     if (mainWindow) mainWindow.webContents.send('trigger-window-capture');
+  });
+  globalShortcut.register('CommandOrControl+Shift+P', () => {
+    showMainWindow();
+    openProjectManager();
   });
 }
 
@@ -515,7 +519,7 @@ ipcMain.on('pm-open-in-editor', async (e, filePath) => {
   } catch {}
 });
 
-ipcMain.on('open-project-manager', () => {
+function openProjectManager() {
   if (projectManagerWindow && !projectManagerWindow.isDestroyed()) {
     projectManagerWindow.focus(); return;
   }
@@ -527,7 +531,9 @@ ipcMain.on('open-project-manager', () => {
   require('@electron/remote/main').enable(projectManagerWindow.webContents);
   projectManagerWindow.loadFile(path.join(__dirname, 'renderer', 'project-manager.html'));
   projectManagerWindow.on('closed', () => { projectManagerWindow = null; });
-});
+}
+
+ipcMain.on('open-project-manager', () => openProjectManager());
 
 // エディタからプロジェクトに保存した後、プロジェクトマネージャを更新
 ipcMain.handle('pm-get-project-list-for-editor', async () => loadProjects());
@@ -588,18 +594,15 @@ function createTray() {
     { type: 'separator' },
     {
       label: '範囲選択キャプチャ',
-      accelerator: 'CommandOrControl+Alt+S',
+      accelerator: 'CommandOrControl+Shift+1',
       click: () => startAreaCapture(),
     },
     {
       label: 'プロジェクト管理',
+      accelerator: 'CommandOrControl+Shift+P',
       click: () => {
         showMainWindow();
-        if (projectManagerWindow && !projectManagerWindow.isDestroyed()) {
-          projectManagerWindow.focus();
-        } else {
-          mainWindow.webContents.send('open-project-manager-from-tray');
-        }
+        openProjectManager();
       },
     },
     { type: 'separator' },
