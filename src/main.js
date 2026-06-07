@@ -120,21 +120,116 @@ let searchWindow = null;
 let selectorWindows = [];
 
 // ---- OCR エンジン ----
-let ocrWorker = null;
-const ocrQueue = [];   // [{pid, cid, filePath}]
+let ocrWorker = null;         // Tesseract (fallback)
+let ocrHelperReady = false;   // OS ネイティブ OCR が使えるか
+const ocrQueue = [];
 let ocrRunning = false;
 
+// ---- macOS: Vision Framework (Swift バイナリ) ----
+const SWIFT_OCR_SRC = `\
+import Vision
+import AppKit
+import Foundation
+
+guard CommandLine.arguments.count > 1 else { exit(1) }
+let imagePath = CommandLine.arguments[1]
+guard let image = NSImage(contentsOfFile: imagePath),
+      let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { exit(1) }
+
+let sema = DispatchSemaphore(value: 0)
+var lines: [String] = []
+let req = VNRecognizeTextRequest { r, _ in
+    defer { sema.signal() }
+    lines = (r.results as? [VNRecognizedTextObservation] ?? []).compactMap { $0.topCandidates(1).first?.string }
+}
+req.recognitionLevel = .accurate
+req.recognitionLanguages = ["ja-JP", "en-US"]
+req.usesLanguageCorrection = true
+try? VNImageRequestHandler(cgImage: cgImage, options: [:]).perform([req])
+sema.wait()
+print(lines.joined(separator: "\\n"))
+`;
+
+// ---- Windows: PowerShell + Windows.Media.Ocr ----
+const PS_OCR_SCRIPT = `\
+param([string]$Path)
+Add-Type -AssemblyName System.Runtime.WindowsRuntime
+$null = [Windows.Storage.StorageFile,Windows.Storage,ContentType=WindowsRuntime]
+$null = [Windows.Media.Ocr.OcrEngine,Windows.Foundation,ContentType=WindowsRuntime]
+$null = [Windows.Graphics.Imaging.BitmapDecoder,Windows.Foundation,ContentType=WindowsRuntime]
+$ag = ([System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object { $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation\`1' })[0]
+function Await($t,$r){ $s=$ag.MakeGenericMethod($r); $n=$s.Invoke($null,@($t)); $n.Wait(-1)|Out-Null; $n.Result }
+$file   = Await ([Windows.Storage.StorageFile]::GetFileFromPathAsync($Path)) ([Windows.Storage.StorageFile])
+$stream = Await ($file.OpenAsync(0)) ([Windows.Storage.Streams.IRandomAccessStream])
+$dec    = Await ([Windows.Graphics.Imaging.BitmapDecoder]::CreateAsync($stream)) ([Windows.Graphics.Imaging.BitmapDecoder])
+$bmp    = Await ($dec.GetSoftwareBitmapAsync()) ([Windows.Graphics.Imaging.SoftwareBitmap])
+$eng    = [Windows.Media.Ocr.OcrEngine]::TryCreateFromUserProfileLanguages()
+if (-not $eng) { exit 1 }
+$res    = Await ($eng.RecognizeAsync($bmp)) ([Windows.Media.Ocr.OcrResult])
+Write-Output $res.Text
+`;
+
+let _ocrHelperBin  = null;   // macOS: compiled binary path
+let _ocrHelperScript = null; // Windows: .ps1 path
+
 async function initOcr() {
-  const { createWorker } = require('tesseract.js');
-  const tessDataPath = path.join(app.getPath('userData'), 'tessdata');
-  await fs.promises.mkdir(tessDataPath, { recursive: true });
-  ocrWorker = await createWorker('jpn+eng', 1, {
-    cachePath: tessDataPath,
-    logger: () => {},
-  });
-  console.log('[ScreenCap] OCR worker ready');
+  const helpersDir = path.join(app.getPath('userData'), 'helpers');
+  await fs.promises.mkdir(helpersDir, { recursive: true });
+
+  if (process.platform === 'darwin') {
+    _ocrHelperBin = path.join(helpersDir, 'ocr_helper');
+    const srcPath  = path.join(helpersDir, 'ocr_helper.swift');
+    if (!fs.existsSync(_ocrHelperBin)) {
+      console.log('[ScreenCap] Compiling Vision OCR helper (first run, ~30s)…');
+      await fs.promises.writeFile(srcPath, SWIFT_OCR_SRC);
+      await new Promise((resolve, reject) => {
+        const { spawn: sp } = require('child_process');
+        const proc = sp('swiftc', [srcPath, '-o', _ocrHelperBin]);
+        proc.on('close', code => code === 0 ? resolve() : reject(new Error(`swiftc exit ${code}`)));
+      });
+      console.log('[ScreenCap] Vision OCR helper ready');
+    }
+    ocrHelperReady = true;
+  } else if (process.platform === 'win32') {
+    _ocrHelperScript = path.join(helpersDir, 'ocr_helper.ps1');
+    await fs.promises.writeFile(_ocrHelperScript, PS_OCR_SCRIPT);
+    ocrHelperReady = true;
+    console.log('[ScreenCap] Windows.Media.Ocr helper ready');
+  }
+
+  // Tesseract をフォールバックとして初期化
+  try {
+    const { createWorker } = require('tesseract.js');
+    const tessDataPath = path.join(app.getPath('userData'), 'tessdata');
+    await fs.promises.mkdir(tessDataPath, { recursive: true });
+    ocrWorker = await createWorker('jpn+eng', 1, { cachePath: tessDataPath, logger: () => {} });
+    console.log('[ScreenCap] Tesseract (fallback) ready');
+  } catch (e) {
+    console.warn('[ScreenCap] Tesseract init failed:', e.message);
+  }
+
   await enqueueOcrBackfill();
   processOcrQueue();
+}
+
+// OS ネイティブ OCR で画像テキストを取得する
+async function recognizeWithOs(filePath) {
+  const { spawn: sp } = require('child_process');
+  return new Promise((resolve, reject) => {
+    let proc;
+    if (process.platform === 'darwin') {
+      proc = sp(_ocrHelperBin, [filePath]);
+    } else {
+      proc = sp('powershell', ['-NoProfile', '-NonInteractive', '-File', _ocrHelperScript, filePath], { windowsHide: true });
+    }
+    let out = '', err = '';
+    proc.stdout.on('data', d => { out += d; });
+    proc.stderr.on('data', d => { err += d; });
+    proc.on('close', code => {
+      if (code === 0) resolve(out.trim());
+      else reject(new Error(`OS OCR exit ${code}: ${err.trim()}`));
+    });
+  });
 }
 
 // ocrText が未設定のキャプチャをすべてキューに追加する
@@ -160,13 +255,19 @@ function enqueueOcr(pid, cid, filePath) {
 }
 
 async function processOcrQueue() {
-  if (ocrRunning || !ocrWorker || ocrQueue.length === 0) return;
+  if (ocrRunning || (!ocrHelperReady && !ocrWorker) || ocrQueue.length === 0) return;
   ocrRunning = true;
   while (ocrQueue.length > 0) {
     const { pid, cid, filePath } = ocrQueue.shift();
     try {
-      const { data: { text } } = await ocrWorker.recognize(filePath);
-      const ocrText = text.replace(/\s+/g, ' ').trim();
+      let rawText = '';
+      if (ocrHelperReady) {
+        rawText = await recognizeWithOs(filePath);
+      } else {
+        const { data: { text } } = await ocrWorker.recognize(filePath);
+        rawText = text;
+      }
+      const ocrText = rawText.replace(/\s+/g, ' ').trim();
 
       // captures.json に保存
       const list = await loadCaptures(pid);
