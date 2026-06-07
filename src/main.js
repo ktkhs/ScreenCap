@@ -133,7 +133,25 @@ async function initOcr() {
     logger: () => {},
   });
   console.log('[ScreenCap] OCR worker ready');
-  processOcrQueue();   // キューに積まれた未処理分を開始
+  await enqueueOcrBackfill();
+  processOcrQueue();
+}
+
+// ocrText が未設定のキャプチャをすべてキューに追加する
+async function enqueueOcrBackfill() {
+  const projects = await loadProjects();
+  let count = 0;
+  for (const proj of projects) {
+    const captures = await loadCaptures(proj.id);
+    for (const cap of captures) {
+      if (!cap.ocrText && cap.filename) {
+        const filePath = path.join(projectDir(proj.id), cap.filename);
+        ocrQueue.push({ pid: proj.id, cid: cap.id, filePath });
+        count++;
+      }
+    }
+  }
+  if (count > 0) console.log(`[ScreenCap] OCR backfill: ${count} captures queued`);
 }
 
 function enqueueOcr(pid, cid, filePath) {
