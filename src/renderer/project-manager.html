@@ -401,7 +401,7 @@ body {
 .tree-edge {
   pointer-events: stroke;
   cursor: pointer;
-  stroke: #585b70;
+  stroke: #cba6f7;
   stroke-width: 2;
   fill: none;
 }
@@ -480,6 +480,7 @@ body {
       <button class="view-toggle-btn" data-view="tree"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" style="vertical-align:middle"><circle cx="8" cy="3" r="1.5" fill="white"/><circle cx="4" cy="13" r="1.5" fill="white"/><circle cx="12" cy="13" r="1.5" fill="white"/><line x1="8" y1="4.5" x2="4" y2="11.5"/><line x1="8" y1="4.5" x2="12" y2="11.5"/></svg> ツリー</button>
     </div>
     <button class="connect-btn" id="btn-connect-mode" style="display:none"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><path d="M6.5 9.5a3 3 0 004.2 0l2-2a3 3 0 00-4.2-4.2L7 4.8"/><path d="M9.5 6.5a3 3 0 00-4.2 0L3 8.5a3 3 0 004.2 4.2l1.5-1.5"/></svg> 接続</button>
+    <button class="connect-btn" id="btn-arrange" style="display:none"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><rect x="1" y="2" width="5" height="5" rx="1"/><rect x="10" y="2" width="5" height="5" rx="1"/><rect x="1" y="9" width="5" height="5" rx="1"/><rect x="10" y="9" width="5" height="5" rx="1"/></svg> 整列</button>
     <button class="header-btn" id="btn-rename-project" style="display:none">名前を変更</button>
     <button class="header-btn danger" id="btn-delete-project" style="display:none">削除</button>
   </div>
@@ -599,6 +600,7 @@ document.getElementById('view-toggle').addEventListener('click', e => {
   document.getElementById('capture-grid').style.display = view === 'grid' ? '' : 'none';
   document.getElementById('tree-view').style.display  = view === 'tree' ? 'block' : 'none';
   document.getElementById('btn-connect-mode').style.display = view === 'tree' && currentProjectId ? '' : 'none';
+  document.getElementById('btn-arrange').style.display = view === 'tree' && currentProjectId ? '' : 'none';
   if (view === 'tree') renderTree();
 });
 
@@ -696,6 +698,71 @@ btnConnect.addEventListener('click', () => {
   document.querySelectorAll('.tree-node').forEach(n => {
     n.classList.remove('connect-source', 'connect-target-hover');
   });
+});
+
+document.getElementById('btn-arrange').addEventListener('click', () => {
+  if (!treeCaptures.length) return;
+  const NODE_W = 130, NODE_H = 160, GAP_X = 40, GAP_Y = 50, PAD = 30;
+
+  if (treeData.edges.length === 0) {
+    // エッジなし → グリッド整列
+    const cols = Math.ceil(Math.sqrt(treeCaptures.length));
+    treeCaptures.forEach((cap, i) => {
+      treeData.nodes[cap.id] = {
+        x: PAD + (i % cols) * (NODE_W + GAP_X),
+        y: PAD + Math.floor(i / cols) * (NODE_H + GAP_Y),
+      };
+    });
+  } else {
+    // エッジあり → 階層レイアウト（トポロジカルソート → レベル割り当て）
+    const ids = treeCaptures.map(c => c.id);
+    const level = {};
+    ids.forEach(id => { level[id] = 0; });
+    // 各ノードの最大深さを BFS で計算
+    const adj = {};
+    ids.forEach(id => { adj[id] = []; });
+    treeData.edges.forEach(({ from, to }) => {
+      if (adj[from]) adj[from].push(to);
+    });
+    const visited = new Set();
+    const bfs = (start, depth) => {
+      if (visited.has(start + ':' + depth)) return;
+      visited.add(start + ':' + depth);
+      if (depth > level[start]) level[start] = depth;
+      (adj[start] || []).forEach(next => bfs(next, depth + 1));
+    };
+    // in-degree 0 のノードをルートとして BFS
+    const inDegree = {};
+    ids.forEach(id => { inDegree[id] = 0; });
+    treeData.edges.forEach(({ to }) => { inDegree[to] = (inDegree[to] || 0) + 1; });
+    ids.filter(id => !inDegree[id]).forEach(root => bfs(root, 0));
+    // 孤立ノードも含め level でグループ化
+    const byLevel = {};
+    ids.forEach(id => {
+      const lv = level[id] || 0;
+      (byLevel[lv] = byLevel[lv] || []).push(id);
+    });
+    const levels = Object.keys(byLevel).map(Number).sort((a, b) => a - b);
+    levels.forEach(lv => {
+      byLevel[lv].forEach((id, i) => {
+        treeData.nodes[id] = {
+          x: PAD + i * (NODE_W + GAP_X),
+          y: PAD + lv * (NODE_H + GAP_Y),
+        };
+      });
+    });
+  }
+
+  // DOM に即時反映
+  document.querySelectorAll('.tree-node').forEach(el => {
+    const id = el.dataset.id;
+    if (treeData.nodes[id]) {
+      el.style.left = treeData.nodes[id].x + 'px';
+      el.style.top  = treeData.nodes[id].y + 'px';
+    }
+  });
+  redrawEdges();
+  saveTreeData();
 });
 
 async function loadTreeData() {
@@ -830,7 +897,7 @@ function redrawEdges() {
     const defs = svg.querySelector('defs') || (() => { const d = document.createElementNS('http://www.w3.org/2000/svg','defs'); svg.appendChild(d); return d; })();
     const markerId = `arrow-${idx}`;
     defs.innerHTML += `<marker id="${markerId}" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
-      <path d="M0,0 L0,6 L8,3 z" fill="#585b70"/>
+      <path d="M0,0 L0,6 L8,3 z" fill="#cba6f7"/>
     </marker>`;
     line.setAttribute('marker-end', `url(#${markerId})`);
 
@@ -993,6 +1060,7 @@ async function selectProject(id) {
   document.getElementById('btn-rename-project').style.display = '';
   document.getElementById('btn-delete-project').style.display = '';
   document.getElementById('btn-connect-mode').style.display = currentView === 'tree' ? '' : 'none';
+  document.getElementById('btn-arrange').style.display = currentView === 'tree' ? '' : 'none';
   await loadCaptures();
 }
 
