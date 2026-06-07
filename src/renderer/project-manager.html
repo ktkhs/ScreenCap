@@ -754,10 +754,11 @@ document.getElementById('btn-arrange').addEventListener('click', () => {
     const level = {};
     ids.forEach(id => { level[id] = 0; });
     // 各ノードの最大深さを BFS で計算
+    // ドロップ先(to)を親として扱うため辺の向きを逆にして BFS
     const adj = {};
     ids.forEach(id => { adj[id] = []; });
     treeData.edges.forEach(({ from, to }) => {
-      if (adj[from]) adj[from].push(to);
+      if (adj[to]) adj[to].push(from);
     });
     const visited = new Set();
     const bfs = (start, depth) => {
@@ -766,10 +767,10 @@ document.getElementById('btn-arrange').addEventListener('click', () => {
       if (depth > level[start]) level[start] = depth;
       (adj[start] || []).forEach(next => bfs(next, depth + 1));
     };
-    // in-degree 0 のノードをルートとして BFS
+    // in-degree 0 のノード（親のいないノード）をルートとして BFS
     const inDegree = {};
     ids.forEach(id => { inDegree[id] = 0; });
-    treeData.edges.forEach(({ to }) => { inDegree[to] = (inDegree[to] || 0) + 1; });
+    treeData.edges.forEach(({ from }) => { inDegree[from] = (inDegree[from] || 0) + 1; });
     ids.filter(id => !inDegree[id]).forEach(root => bfs(root, 0));
     // 孤立ノードも含め level でグループ化
     const byLevel = {};
