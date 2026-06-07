@@ -111,26 +111,26 @@
 </head>
 <body>
 <div id="toolbar">
-  <button class="tool-btn" id="tool-select" title="選択">▶ 選択</button>
-  <button class="tool-btn active" id="tool-arrow" title="矢印">↗ 矢印</button>
-  <button class="tool-btn" id="tool-rect" title="四角形">▭ 四角</button>
-  <button class="tool-btn" id="tool-pen" title="ペン">✏️ ペン</button>
-  <button class="tool-btn" id="tool-text" title="テキスト">T テキスト</button>
+  <button class="tool-btn" id="tool-select" title="選択"><svg width="14" height="14" viewBox="0 0 16 16" fill="white" style="vertical-align:middle"><path d="M4.5 2L4.5 12.5L7 10L9 14.5L10.5 13.8L8.5 9.5L12 9.5Z"/></svg> 選択</button>
+  <button class="tool-btn active" id="tool-arrow" title="矢印"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><line x1="3" y1="13" x2="13" y2="3"/><polyline points="7,3 13,3 13,9"/></svg> 矢印</button>
+  <button class="tool-btn" id="tool-rect" title="四角形"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" style="vertical-align:middle"><rect x="2" y="4" width="12" height="8" rx="1"/></svg> 四角</button>
+  <button class="tool-btn" id="tool-pen" title="ペン"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" style="vertical-align:middle"><path d="M2 13C5 9 7 6 10 7C12 8 13 5 14 3"/></svg> ペン</button>
+  <button class="tool-btn" id="tool-text" title="テキスト"><svg width="14" height="14" viewBox="0 0 16 16" fill="white" style="vertical-align:middle"><path d="M2 4h12v2H9v7H7V6H2V4z"/></svg> テキスト</button>
   <div class="sep"></div>
   <input type="color" id="color-picker" value="#ff3399" title="色">
   <label>太さ</label>
   <input type="range" id="stroke-size" min="1" max="12" value="3">
   <div class="sep"></div>
-  <button class="action-btn" id="btn-delete" style="background:#f38ba8;color:#1e1e2e;display:none">🗑 削除</button>
-  <button class="action-btn" id="btn-undo">↩ 元に戻す</button>
+  <button class="action-btn" id="btn-delete" style="background:#f38ba8;color:#1e1e2e;display:none"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><polyline points="3,5 13,5"/><path d="M5 5V3a1 1 0 011-1h4a1 1 0 011 1v2"/><path d="M4 5l1 9h6l1-9"/></svg> 削除</button>
+  <button class="action-btn" id="btn-undo"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><path d="M4 6H11a3 3 0 010 6H7"/><polyline points="7,3 4,6 7,9"/></svg> 元に戻す</button>
   <div class="sep"></div>
   <select id="fmt-select">
     <option value="png">PNG</option>
     <option value="jpg">JPG</option>
   </select>
-  <button class="action-btn" id="btn-save">💾 保存</button>
-  <button class="action-btn" id="btn-copy">📋 コピー</button>
-  <button class="action-btn" id="btn-save-project" style="background:#cba6f7;color:#1e1e2e">📁 プロジェクトに保存</button>
+  <button class="action-btn" id="btn-save"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><path d="M13 13H3V3h8l2 2v8z"/><rect x="5" y="9" width="6" height="4"/><rect x="5" y="3" width="4" height="3"/></svg> 保存</button>
+  <button class="action-btn" id="btn-copy"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><rect x="5" y="4" width="9" height="10" rx="1"/><path d="M5 12H3V2h8v2"/></svg> コピー</button>
+  <button class="action-btn" id="btn-save-project" style="background:#cba6f7;color:#1e1e2e"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><path d="M1 4a1 1 0 011-1h4l2 2h6a1 1 0 011 1v7a1 1 0 01-1 1H2a1 1 0 01-1-1V4z"/></svg> プロジェクトに保存</button>
 </div>
 
 <!-- プロジェクト保存モーダル -->

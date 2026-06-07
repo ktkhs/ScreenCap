@@ -463,8 +463,8 @@ body {
 
 <div id="sidebar">
   <div id="sidebar-header">
-    <span>📁 プロジェクト</span>
-    <button id="btn-new-project" title="新規プロジェクト">＋</button>
+    <span><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><path d="M1 4a1 1 0 011-1h4l2 2h6a1 1 0 011 1v7a1 1 0 01-1 1H2a1 1 0 01-1-1V4z"/></svg> プロジェクト</span>
+    <button id="btn-new-project" title="新規プロジェクト"><svg width="14" height="14" viewBox="0 0 16 16" stroke="white" stroke-width="2.5" stroke-linecap="round" style="vertical-align:middle"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg></button>
   </div>
   <div id="project-list"></div>
 </div>
@@ -473,10 +473,10 @@ body {
   <div id="panel-header">
     <span id="panel-title" style="color:#6c7086">プロジェクトを選択してください</span>
     <div class="view-toggle" id="view-toggle" style="display:none">
-      <button class="view-toggle-btn active" data-view="grid">☰ グリッド</button>
-      <button class="view-toggle-btn" data-view="tree">⬡ ツリー</button>
+      <button class="view-toggle-btn active" data-view="grid"><svg width="13" height="13" viewBox="0 0 16 16" stroke="white" stroke-width="1.5" stroke-linecap="round" style="vertical-align:middle"><line x1="2" y1="5" x2="14" y2="5"/><line x1="2" y1="8" x2="14" y2="8"/><line x1="2" y1="11" x2="14" y2="11"/></svg> グリッド</button>
+      <button class="view-toggle-btn" data-view="tree"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" style="vertical-align:middle"><circle cx="8" cy="3" r="1.5" fill="white"/><circle cx="4" cy="13" r="1.5" fill="white"/><circle cx="12" cy="13" r="1.5" fill="white"/><line x1="8" y1="4.5" x2="4" y2="11.5"/><line x1="8" y1="4.5" x2="12" y2="11.5"/></svg> ツリー</button>
     </div>
-    <button class="connect-btn" id="btn-connect-mode" style="display:none">🔗 接続</button>
+    <button class="connect-btn" id="btn-connect-mode" style="display:none"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><path d="M6.5 9.5a3 3 0 004.2 0l2-2a3 3 0 00-4.2-4.2L7 4.8"/><path d="M9.5 6.5a3 3 0 00-4.2 0L3 8.5a3 3 0 004.2 4.2l1.5-1.5"/></svg> 接続</button>
     <button class="header-btn" id="btn-rename-project" style="display:none">名前を変更</button>
     <button class="header-btn danger" id="btn-delete-project" style="display:none">削除</button>
   </div>
@@ -490,13 +490,13 @@ body {
       <div id="preview-info">
         <div id="preview-name"></div>
         <div id="preview-date"></div>
-        <div id="preview-memo-label" style="display:none">📝 メモ</div>
+        <div id="preview-memo-label" style="display:none"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" style="vertical-align:middle"><rect x="2" y="1" width="12" height="14" rx="1"/><line x1="5" y1="5" x2="11" y2="5"/><line x1="5" y1="8" x2="11" y2="8"/><line x1="5" y1="11" x2="8" y2="11"/></svg> メモ</div>
         <div id="preview-memo"></div>
       </div>
       <div id="preview-actions">
-        <button class="preview-btn primary" id="preview-btn-edit">✏️ エディタで開く</button>
-        <button class="preview-btn" id="preview-btn-memo">📝 メモを編集</button>
-        <button class="preview-btn danger" id="preview-btn-delete">🗑 削除</button>
+        <button class="preview-btn primary" id="preview-btn-edit"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><path d="M11.5 2.5l2 2-8 8-3 0.5 0.5-3z"/><line x1="9.5" y1="4.5" x2="11.5" y2="6.5"/></svg> エディタで開く</button>
+        <button class="preview-btn" id="preview-btn-memo"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" style="vertical-align:middle"><rect x="2" y="1" width="12" height="14" rx="1"/><line x1="5" y1="5" x2="11" y2="5"/><line x1="5" y1="8" x2="11" y2="8"/><line x1="5" y1="11" x2="8" y2="11"/></svg> メモを編集</button>
+        <button class="preview-btn danger" id="preview-btn-delete"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><polyline points="3,5 13,5"/><path d="M5 5V3a1 1 0 011-1h4a1 1 0 011 1v2"/><path d="M4 5l1 9h6l1-9"/></svg> 削除</button>
       </div>
     </div>
 
@@ -511,7 +511,7 @@ body {
       <div id="tree-hint"></div>
     </div>
     <div id="empty-state">
-      <div class="empty-icon">📂</div>
+      <div class="empty-icon"><svg width="44" height="44" viewBox="0 0 16 16" fill="none" stroke="white" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><path d="M1 13V5a1 1 0 011-1h4l2 2h6"/><path d="M1 8h14l-2 5H3z"/></svg></div>
       <div>プロジェクトを選択してください</div>
     </div>
   </div>
@@ -525,7 +525,7 @@ body {
 <!-- メモモーダル -->
 <div id="memo-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:200;align-items:center;justify-content:center;">
   <div style="background:#1e1e2e;border:1px solid #313244;border-radius:12px;padding:20px;width:360px;display:flex;flex-direction:column;gap:12px;">
-    <div style="font-size:14px;font-weight:600;color:#cba6f7">📝 メモを編集</div>
+    <div style="font-size:14px;font-weight:600;color:#cba6f7"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="#cba6f7" stroke-width="1.5" stroke-linecap="round" style="vertical-align:middle"><rect x="2" y="1" width="12" height="14" rx="1"/><line x1="5" y1="5" x2="11" y2="5"/><line x1="5" y1="8" x2="11" y2="8"/><line x1="5" y1="11" x2="8" y2="11"/></svg> メモを編集</div>
     <div id="memo-modal-capname" style="font-size:12px;color:#6c7086"></div>
     <textarea id="memo-modal-field"
       style="background:#313244;color:#cdd6f4;border:none;border-radius:7px;padding:8px 10px;font-size:13px;width:100%;height:120px;resize:vertical;outline:none;font-family:inherit;line-height:1.6"
@@ -563,6 +563,20 @@ body {
 
 <script>
 const { ipcRenderer } = require('electron');
+
+const IC = {
+  folder:     `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><path d="M1 4a1 1 0 011-1h4l2 2h6a1 1 0 011 1v7a1 1 0 01-1 1H2a1 1 0 01-1-1V4z"/></svg>`,
+  pencil:     `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><path d="M11.5 2.5l2 2-8 8-3 0.5 0.5-3z"/><line x1="9.5" y1="4.5" x2="11.5" y2="6.5"/></svg>`,
+  memo:       `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" style="vertical-align:middle"><rect x="2" y="1" width="12" height="14" rx="1"/><line x1="5" y1="5" x2="11" y2="5"/><line x1="5" y1="8" x2="11" y2="8"/><line x1="5" y1="11" x2="8" y2="11"/></svg>`,
+  trash:      `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><polyline points="3,5 13,5"/><path d="M5 5V3a1 1 0 011-1h4a1 1 0 011 1v2"/><path d="M4 5l1 9h6l1-9"/></svg>`,
+  link:       `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><path d="M6.5 9.5a3 3 0 004.2 0l2-2a3 3 0 00-4.2-4.2L7 4.8"/><path d="M9.5 6.5a3 3 0 00-4.2 0L3 8.5a3 3 0 004.2 4.2l1.5-1.5"/></svg>`,
+  cross:      `<svg width="12" height="12" viewBox="0 0 16 16" stroke="white" stroke-width="2.5" stroke-linecap="round" style="vertical-align:middle"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg>`,
+  grid:       `<svg width="13" height="13" viewBox="0 0 16 16" stroke="white" stroke-width="1.5" stroke-linecap="round" style="vertical-align:middle"><line x1="2" y1="5" x2="14" y2="5"/><line x1="2" y1="8" x2="14" y2="8"/><line x1="2" y1="11" x2="14" y2="11"/></svg>`,
+  tree:       `<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" style="vertical-align:middle"><circle cx="8" cy="3" r="1.5" fill="white"/><circle cx="4" cy="13" r="1.5" fill="white"/><circle cx="12" cy="13" r="1.5" fill="white"/><line x1="8" y1="4.5" x2="4" y2="11.5"/><line x1="8" y1="4.5" x2="12" y2="11.5"/></svg>`,
+  dots:       `<svg width="14" height="14" viewBox="0 0 16 16" fill="white" style="vertical-align:middle"><circle cx="4" cy="8" r="1.5"/><circle cx="8" cy="8" r="1.5"/><circle cx="12" cy="8" r="1.5"/></svg>`,
+  image:      `<svg width="44" height="44" viewBox="0 0 16 16" fill="none" stroke="white" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="2" width="14" height="12" rx="1.5"/><circle cx="5.5" cy="6" r="1.5"/><path d="M1 12l4-4 3 3 2-2 5 4"/></svg>`,
+  openFolder: `<svg width="44" height="44" viewBox="0 0 16 16" fill="none" stroke="white" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><path d="M1 13V5a1 1 0 011-1h4l2 2h6"/><path d="M1 8h14l-2 5H3z"/></svg>`,
+};
 
 let projects = [];
 let currentProjectId = null;
@@ -644,7 +658,9 @@ btnConnect.addEventListener('click', () => {
   connectMode = !connectMode;
   connectSource = null;
   btnConnect.classList.toggle('active', connectMode);
-  btnConnect.textContent = connectMode ? '✕ キャンセル' : '🔗 接続';
+  btnConnect.innerHTML = connectMode
+    ? `${IC.cross} キャンセル`
+    : `${IC.link} 接続`;
   showTreeHint(connectMode ? '接続元のノードをクリックしてください' : '');
   document.querySelectorAll('.tree-node').forEach(n => {
     n.classList.remove('connect-source', 'connect-target-hover');
@@ -899,10 +915,10 @@ function renderProjects() {
     div.className = 'project-item' + (p.id === currentProjectId ? ' active' : '');
     div.dataset.id = p.id;
     div.innerHTML = `
-      <span class="proj-icon">📁</span>
+      <span class="proj-icon">${IC.folder}</span>
       <span class="proj-name">${esc(p.name)}</span>
       <span class="proj-count" id="count-${p.id}">0</span>
-      <button class="proj-menu-btn" data-id="${p.id}" title="メニュー">⋯</button>`;
+      <button class="proj-menu-btn" data-id="${p.id}" title="メニュー">${IC.dots}</button>`;
     div.addEventListener('click', (e) => {
       if (!e.target.classList.contains('proj-menu-btn')) selectProject(p.id);
     });
@@ -929,7 +945,7 @@ async function selectProject(id) {
   connectMode = false;
   connectSource = null;
   document.getElementById('btn-connect-mode').classList.remove('active');
-  document.getElementById('btn-connect-mode').textContent = '🔗 接続';
+  document.getElementById('btn-connect-mode').innerHTML = `${IC.link} 接続`;
   renderProjects();
   const p = projects.find(x => x.id === id);
   document.getElementById('panel-title').textContent = p ? p.name : '';
@@ -1013,7 +1029,7 @@ function renderCaptures(captures) {
   if (captures.length === 0) {
     hidePreview();
     empty.style.display = 'flex';
-    empty.innerHTML = `<div class="empty-icon">🖼️</div><div>キャプチャがまだありません</div><div style="font-size:12px;color:#585b70">エディタの「プロジェクトに保存」から追加できます</div>`;
+    empty.innerHTML = `<div class="empty-icon">${IC.image}</div><div>キャプチャがまだありません</div><div style="font-size:12px;color:#585b70">エディタの「プロジェクトに保存」から追加できます</div>`;
     return;
   }
   empty.style.display = 'none';
@@ -1028,12 +1044,12 @@ function renderCaptures(captures) {
       <div class="card-body">
         <div class="cap-name" title="${esc(cap.name)}">${esc(cap.name)}</div>
         <div class="cap-date">${date}</div>
-        ${cap.memo ? `<div class="cap-memo-badge" title="${esc(cap.memo)}">📝 ${esc(cap.memo)}</div>` : ''}
+        ${cap.memo ? `<div class="cap-memo-badge" title="${esc(cap.memo)}">${IC.memo} ${esc(cap.memo)}</div>` : ''}
       </div>
       <div class="card-actions">
-        <button class="card-action-btn" data-action="memo" title="メモ">📝</button>
-        <button class="card-action-btn" data-action="edit" title="エディタで開く">✏️</button>
-        <button class="card-action-btn del" data-action="delete" title="削除">🗑</button>
+        <button class="card-action-btn" data-action="memo" title="メモ">${IC.memo}</button>
+        <button class="card-action-btn" data-action="edit" title="エディタで開く">${IC.pencil}</button>
+        <button class="card-action-btn del" data-action="delete" title="削除">${IC.trash}</button>
       </div>`;
 
     const img = card.querySelector('.thumb');
@@ -1125,7 +1141,7 @@ async function deleteCurrentProject() {
   document.getElementById('tree-canvas').innerHTML = '';
   document.getElementById('tree-svg').innerHTML = '';
   document.getElementById('empty-state').style.display = 'flex';
-  document.getElementById('empty-state').innerHTML = `<div class="empty-icon">📂</div><div>プロジェクトを選択してください</div>`;
+  document.getElementById('empty-state').innerHTML = `<div class="empty-icon">${IC.openFolder}</div><div>プロジェクトを選択してください</div>`;
   renderProjects();
 }
 
