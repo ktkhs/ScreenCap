@@ -1,9 +1,10 @@
-const { app, BrowserWindow, globalShortcut, ipcMain, screen, clipboard, nativeImage, dialog, desktopCapturer, systemPreferences, shell } = require('electron');
+const { app, BrowserWindow, globalShortcut, ipcMain, screen, clipboard, nativeImage, dialog, desktopCapturer, systemPreferences, shell, Tray, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
 require('@electron/remote/main').initialize();
 
 let mainWindow = null;
+let tray = null;
 let selectorWindows = [];
 let editorWindow = null;
 let selectionStart = null;
@@ -31,6 +32,14 @@ function createMainWindow() {
   });
   require('@electron/remote/main').enable(mainWindow.webContents);
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'main.html'));
+  // 閉じるボタンでは終了せずトレイに隠す
+  mainWindow.on('close', e => {
+    if (!app.isQuitting) {
+      e.preventDefault();
+      mainWindow.hide();
+      if (process.platform === 'darwin') app.dock.hide();
+    }
+  });
   mainWindow.on('closed', () => { mainWindow = null; });
 }
 
@@ -561,17 +570,79 @@ ipcMain.on('copy-to-clipboard', (event, dataUrl) => {
   clipboard.writeImage(nativeImage.createFromDataURL(dataUrl));
 });
 
+// ---- トレイ ----
+
+function createTray() {
+  const iconPath = path.join(__dirname, 'assets', 'tray-icon.png');
+  const icon = nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 });
+  if (process.platform === 'darwin') icon.setTemplateImage(true);
+
+  tray = new Tray(icon);
+  tray.setToolTip('ScreenCap');
+
+  const menu = Menu.buildFromTemplate([
+    {
+      label: 'ScreenCap を表示',
+      click: () => showMainWindow(),
+    },
+    { type: 'separator' },
+    {
+      label: '範囲選択キャプチャ',
+      accelerator: 'CommandOrControl+Alt+S',
+      click: () => startAreaCapture(),
+    },
+    {
+      label: 'プロジェクト管理',
+      click: () => {
+        showMainWindow();
+        if (projectManagerWindow && !projectManagerWindow.isDestroyed()) {
+          projectManagerWindow.focus();
+        } else {
+          mainWindow.webContents.send('open-project-manager-from-tray');
+        }
+      },
+    },
+    { type: 'separator' },
+    {
+      label: '終了',
+      click: () => {
+        app.isQuitting = true;
+        app.quit();
+      },
+    },
+  ]);
+
+  tray.setContextMenu(menu);
+
+  // macOS: クリックでメインウィンドウ表示
+  // Windows: ダブルクリックで表示
+  tray.on('click', () => showMainWindow());
+  tray.on('double-click', () => showMainWindow());
+}
+
+function showMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    createMainWindow();
+  }
+  if (process.platform === 'darwin') app.dock.show();
+  mainWindow.show();
+  mainWindow.focus();
+}
+
 // ---- アプリライフサイクル ----
 
 app.whenReady().then(() => {
   dataDir = path.join(app.getPath('userData'), 'screencap');
   fs.mkdirSync(dataDir, { recursive: true });
   createMainWindow();
+  createTray();
   registerHotkeys();
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createMainWindow();
+    // macOS: Dock アイコンクリックで再表示
+    showMainWindow();
   });
 });
 
 app.on('will-quit', () => { globalShortcut.unregisterAll(); });
-app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
+// トレイ常駐のため window-all-closed では終了しない
+app.on('window-all-closed', () => { /* トレイが生きている間は終了しない */ });
