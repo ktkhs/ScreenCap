@@ -405,7 +405,7 @@ ipcMain.on('open-project-manager', () => {
     projectManagerWindow.focus(); return;
   }
   projectManagerWindow = new BrowserWindow({
-    width: 900, height: 600, minWidth: 600, minHeight: 400,
+    width: 1024, height: 768, minWidth: 600, minHeight: 400,
     webPreferences: { nodeIntegration: true, contextIsolation: false, enableRemoteModule: true },
     title: 'ScreenCap - プロジェクト管理',
   });
