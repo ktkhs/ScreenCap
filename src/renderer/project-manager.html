@@ -371,6 +371,7 @@ body {
 .tree-node:hover { border-color: #6c7086; }
 .tree-node.connect-source { border-color: #cba6f7; box-shadow: 0 0 0 2px rgba(203,166,247,0.3); }
 .tree-node.connect-target-hover { border-color: #a6e3a1; box-shadow: 0 0 0 2px rgba(166,227,161,0.3); }
+.tree-node.drag-over { border-color: #89b4fa; box-shadow: 0 0 0 3px rgba(137,180,250,0.4); }
 .tree-node img {
   width: 100%;
   aspect-ratio: 4/3;
@@ -641,18 +642,46 @@ window.addEventListener('mousemove', e => {
   if (!treeDrag) return;
   const dx = e.clientX - treeDrag.startX;
   const dy = e.clientY - treeDrag.startY;
+  if (!treeDrag.moved && Math.abs(dx) < 5 && Math.abs(dy) < 5) return;
+  treeDrag.moved = true;
   const nx = Math.max(0, treeDrag.nodeStartX + dx);
   const ny = Math.max(0, treeDrag.nodeStartY + dy);
   treeData.nodes[treeDrag.capId] = { x: nx, y: ny };
   treeDrag.nodeEl.style.left = nx + 'px';
   treeDrag.nodeEl.style.top  = ny + 'px';
   redrawEdges();
+
+  // ドロップターゲットのハイライト
+  const overNode = document.elementFromPoint(e.clientX, e.clientY)?.closest('.tree-node');
+  document.querySelectorAll('.tree-node.drag-over').forEach(n => n.classList.remove('drag-over'));
+  if (overNode && overNode !== treeDrag.nodeEl) {
+    overNode.classList.add('drag-over');
+  }
 });
 
-window.addEventListener('mouseup', () => {
+window.addEventListener('mouseup', e => {
   if (!treeDrag) return;
+  document.querySelectorAll('.tree-node.drag-over').forEach(n => n.classList.remove('drag-over'));
+
+  if (treeDrag.moved) {
+    // ドロップ先ノードを探す
+    treeDrag.nodeEl.style.pointerEvents = 'none';
+    const overNode = document.elementFromPoint(e.clientX, e.clientY)?.closest('.tree-node');
+    treeDrag.nodeEl.style.pointerEvents = '';
+    if (overNode && overNode !== treeDrag.nodeEl) {
+      const from = treeDrag.capId;
+      const to = overNode.dataset.id;
+      const dup = treeData.edges.some(edge =>
+        (edge.from === from && edge.to === to) || (edge.from === to && edge.to === from));
+      if (!dup) {
+        treeData.edges.push({ from, to });
+        redrawEdges();
+      }
+    }
+    saveTreeData();
+  }
+
   treeDrag = null;
-  saveTreeData();
 });
 
 const btnConnect = document.getElementById('btn-connect-mode');
