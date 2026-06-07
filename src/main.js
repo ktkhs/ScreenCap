@@ -1,86 +1,70 @@
 const { app, BrowserWindow, globalShortcut, ipcMain, screen, clipboard, nativeImage, dialog, desktopCapturer, systemPreferences, shell, Tray, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const Database = require('better-sqlite3');
 require('@electron/remote/main').initialize();
 
-// ---- SQLite 検索インデックス ----
-let db = null;
-
-function initDb(dbPath) {
-  db = new Database(dbPath);
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS captures (
-      cap_id       TEXT PRIMARY KEY,
-      project_id   TEXT NOT NULL,
-      project_name TEXT NOT NULL,
-      cap_name     TEXT NOT NULL DEFAULT '',
-      memo         TEXT NOT NULL DEFAULT '',
-      filename     TEXT NOT NULL DEFAULT '',
-      created_at   TEXT NOT NULL DEFAULT ''
-    );
-    CREATE INDEX IF NOT EXISTS idx_project ON captures(project_id);
-  `);
-}
-
-const dbInsert = () => db.prepare(`
-  INSERT OR REPLACE INTO captures (cap_id, project_id, project_name, cap_name, memo, filename, created_at)
-  VALUES (@cap_id, @project_id, @project_name, @cap_name, @memo, @filename, @created_at)
-`);
+// ---- インメモリ検索インデックス ----
+// Map<cap_id, {project_id, project_name, cap_name, memo, filename, created_at}>
+const searchIndex = new Map();
 
 function dbUpsert(row) {
-  dbInsert().run(row);
+  searchIndex.set(row.cap_id, row);
 }
 
 function dbDeleteCapture(cid) {
-  db.prepare('DELETE FROM captures WHERE cap_id = ?').run(cid);
+  searchIndex.delete(cid);
 }
 
 function dbDeleteProject(pid) {
-  db.prepare('DELETE FROM captures WHERE project_id = ?').run(pid);
+  for (const [cid, row] of searchIndex) {
+    if (row.project_id === pid) searchIndex.delete(cid);
+  }
 }
 
 function dbUpdateCapName(cid, name) {
-  db.prepare('UPDATE captures SET cap_name = ? WHERE cap_id = ?').run(name, cid);
+  const row = searchIndex.get(cid);
+  if (row) row.cap_name = name;
 }
 
 function dbUpdateMemo(cid, memo) {
-  db.prepare('UPDATE captures SET memo = ? WHERE cap_id = ?').run(memo, cid);
+  const row = searchIndex.get(cid);
+  if (row) row.memo = memo;
 }
 
 function dbUpdateProjectName(pid, name) {
-  db.prepare('UPDATE captures SET project_name = ? WHERE project_id = ?').run(name, pid);
+  for (const row of searchIndex.values()) {
+    if (row.project_id === pid) row.project_name = name;
+  }
 }
 
 function dbSearch(query) {
-  const q = `%${query}%`;
-  return db.prepare(`
-    SELECT * FROM captures
-    WHERE cap_name LIKE ? OR memo LIKE ? OR project_name LIKE ?
-    ORDER BY created_at DESC
-    LIMIT 200
-  `).all(q, q, q);
+  const q = query.toLowerCase();
+  const results = [];
+  for (const row of searchIndex.values()) {
+    if (
+      row.cap_name.toLowerCase().includes(q) ||
+      row.memo.toLowerCase().includes(q) ||
+      row.project_name.toLowerCase().includes(q)
+    ) results.push(row);
+  }
+  results.sort((a, b) => (b.created_at > a.created_at ? 1 : -1));
+  return results.slice(0, 200);
 }
 
 async function rebuildIndex() {
+  searchIndex.clear();
   const projects = await loadProjects();
-  const insert = dbInsert();
-  const insertMany = db.transaction(rows => { for (const r of rows) insert.run(r); });
-  const rows = [];
   for (const proj of projects) {
     const captures = await loadCaptures(proj.id);
     for (const cap of captures) {
-      rows.push({
+      searchIndex.set(cap.id, {
         cap_id: cap.id, project_id: proj.id, project_name: proj.name,
         cap_name: cap.name || '', memo: cap.memo || '',
         filename: cap.filename || '', created_at: cap.createdAt || '',
       });
     }
   }
-  // 既存データを全削除して再構築
-  db.prepare('DELETE FROM captures').run();
-  insertMany(rows);
-  console.log(`[ScreenCap] Search index rebuilt: ${rows.length} captures`);
+  console.log(`[ScreenCap] Search index built: ${searchIndex.size} captures`);
 }
 
 let mainWindow = null;
@@ -589,12 +573,11 @@ ipcMain.handle('pm-import-project', async () => {
     await saveTree(newId, tree);
 
     // 検索インデックスに追加
-    const insertMany = db.transaction(rows => { const ins = dbInsert(); for (const r of rows) ins.run(r); });
-    insertMany(captures.map(cap => ({
+    captures.forEach(cap => dbUpsert({
       cap_id: cap.id, project_id: newId, project_name: projMeta.name,
       cap_name: cap.name || '', memo: cap.memo || '',
       filename: cap.filename || '', created_at: cap.createdAt || '',
-    })));
+    }));
 
     return { ok: true, id: newId, name: projMeta.name };
   } catch (err) {
@@ -784,7 +767,6 @@ function showMainWindow() {
 app.whenReady().then(async () => {
   dataDir = path.join(app.getPath('userData'), 'screencap');
   fs.mkdirSync(dataDir, { recursive: true });
-  initDb(path.join(dataDir, 'search.db'));
   await rebuildIndex();
   createMainWindow();
   createTray();
