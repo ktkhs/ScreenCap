@@ -3,6 +3,19 @@ const path = require('path');
 const fs = require('fs');
 require('@electron/remote/main').initialize();
 
+// Tesseract WASM コアの C++ 初期化時に出る無害なノイズをアプリ全体で抑制
+{
+  const _tessNoise = /TESSDATA_PREFIX|Error opening data file|Failed loading language/;
+  const _origWrite = process.stderr.write.bind(process.stderr);
+  process.stderr.write = (chunk, enc, cb) => {
+    if (_tessNoise.test(typeof chunk === 'string' ? chunk : chunk.toString())) {
+      if (typeof enc === 'function') enc(); else if (typeof cb === 'function') cb();
+      return true;
+    }
+    return _origWrite(chunk, enc, cb);
+  };
+}
+
 // ---- インメモリ検索インデックス ----
 // Map<cap_id, {project_id, project_name, cap_name, memo, ocr_text, filename, created_at}>
 const searchIndex = new Map();
@@ -117,7 +130,7 @@ async function initOcr() {
   await fs.promises.mkdir(tessDataPath, { recursive: true });
   ocrWorker = await createWorker('jpn+eng', 1, {
     cachePath: tessDataPath,
-    logger: () => {},   // ログ抑制
+    logger: () => {},
   });
   console.log('[ScreenCap] OCR worker ready');
   processOcrQueue();   // キューに積まれた未処理分を開始
