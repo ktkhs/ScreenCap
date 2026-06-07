@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: transparent; }
+  canvas { position: absolute; top: 0; left: 0; cursor: crosshair; display: block; }
+  #size-label {
+    position: absolute;
+    background: rgba(0,0,0,0.75);
+    color: #fff;
+    font-family: monospace;
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    pointer-events: none;
+    display: none;
+    white-space: nowrap;
+    z-index: 10;
+  }
+  #hint {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%,-50%);
+    color: rgba(255,255,255,0.92);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 18px;
+    font-weight: 500;
+    pointer-events: none;
+    text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+    text-align: center;
+    line-height: 1.7;
+    z-index: 10;
+  }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<div id="size-label" id="size-label"></div>
+<div id="hint">ドラッグして範囲を選択<br><small style="font-size:13px;opacity:0.7">Esc でキャンセル</small></div>
+
+<script>
+const { ipcRenderer } = require('electron');
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const sizeLabel = document.getElementById('size-label');
+const hint = document.getElementById('hint');
+
+let layout = null;
+let displayBounds = null; // このウィンドウが担当するディスプレイの bounds (CSS px)
+let dragging = false;
+
+ipcRenderer.on('init', (e, { layout: l, displayIndex }) => {
+  layout = l;
+  displayBounds = l.displays[displayIndex].bounds;
+
+  canvas.width  = displayBounds.width;
+  canvas.height = displayBounds.height;
+  canvas.style.width  = displayBounds.width  + 'px';
+  canvas.style.height = displayBounds.height + 'px';
+
+  drawOverlay(null);
+});
+
+// グローバル選択座標 → このディスプレイのローカル座標に変換して描画
+ipcRenderer.on('selection-update', (e, { start, end }) => {
+  drawOverlay({ start, end });
+  updateSizeLabel(start, end);
+});
+
+function localX(gx) { return gx - displayBounds.x; }
+function localY(gy) { return gy - displayBounds.y; }
+
+function drawOverlay(sel) {
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  if (!sel) {
+    // 選択前: 全体暗く
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(0, 0, W, H);
+    return;
+  }
+
+  const { start, end } = sel;
+  // グローバル選択矩形をこのディスプレイのローカル座標に変換
+  const gx1 = Math.min(start.x, end.x), gy1 = Math.min(start.y, end.y);
+  const gx2 = Math.max(start.x, end.x), gy2 = Math.max(start.y, end.y);
+
+  // このディスプレイ上でのクリップ済み選択領域
+  const lx1 = Math.max(0, localX(gx1)), ly1 = Math.max(0, localY(gy1));
+  const lx2 = Math.min(W, localX(gx2)), ly2 = Math.min(H, localY(gy2));
+  const lw  = lx2 - lx1, lh = ly2 - ly1;
+  const hasLocal = lw > 0 && lh > 0;
+
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  if (!hasLocal) {
+    ctx.fillRect(0, 0, W, H);
+  } else {
+    // 選択外だけ暗くする（4分割）
+    ctx.fillRect(0,   0,    W,   ly1);          // 上
+    ctx.fillRect(0,   ly1,  lx1, lh);           // 左
+    ctx.fillRect(lx2, ly1,  W - lx2, lh);       // 右
+    ctx.fillRect(0,   ly2,  W,   H - ly2);      // 下
+
+    // 選択枠
+    ctx.strokeStyle = '#a78bfa';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(lx1 + 0.5, ly1 + 0.5, lw - 1, lh - 1);
+
+    // コーナーマーカー
+    drawCorners(lx1, ly1, lx2, ly2);
+  }
+}
+
+function drawCorners(x1, y1, x2, y2) {
+  const m = 8;
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 2;
+  [
+    [x1, y1,  1,  1],
+    [x2, y1, -1,  1],
+    [x1, y2,  1, -1],
+    [x2, y2, -1, -1],
+  ].forEach(([cx, cy, sx, sy]) => {
+    ctx.beginPath();
+    ctx.moveTo(cx + sx * m, cy);
+    ctx.lineTo(cx, cy);
+    ctx.lineTo(cx, cy + sy * m);
+    ctx.stroke();
+  });
+}
+
+function updateSizeLabel(start, end) {
+  const w = Math.abs(end.x - start.x), h = Math.abs(end.y - start.y);
+  // サイズラベルはプライマリディスプレイ (displayBounds.x === 0) にだけ表示
+  if (displayBounds.x !== 0 && displayBounds.y !== 0) return;
+  sizeLabel.textContent = `${Math.round(w)} × ${Math.round(h)}`;
+
+  const lx = Math.max(0, localX(Math.min(start.x, end.x)));
+  const ly = Math.max(0, localY(Math.min(start.y, end.y)));
+  const lh = Math.abs(localY(end.y) - localY(start.y));
+  sizeLabel.style.left = lx + 'px';
+  sizeLabel.style.top  = (ly > 24 ? ly - 24 : ly + lh + 6) + 'px';
+  sizeLabel.style.display = 'block';
+}
+
+// ---- マウスイベント → メインプロセスへグローバル座標で送信 ----
+
+canvas.addEventListener('mousedown', e => {
+  dragging = true;
+  hint.style.display = 'none';
+  ipcRenderer.send('selector-mousedown', {
+    gx: e.clientX + displayBounds.x,
+    gy: e.clientY + displayBounds.y,
+  });
+});
+
+let pendingMoveRaf = null;
+let pendingGx = 0, pendingGy = 0;
+canvas.addEventListener('mousemove', e => {
+  if (!dragging) return;
+  pendingGx = e.clientX + displayBounds.x;
+  pendingGy = e.clientY + displayBounds.y;
+  if (!pendingMoveRaf) {
+    pendingMoveRaf = requestAnimationFrame(() => {
+      pendingMoveRaf = null;
+      ipcRenderer.send('selector-mousemove', { gx: pendingGx, gy: pendingGy });
+    });
+  }
+});
+
+canvas.addEventListener('mouseup', e => {
+  if (!dragging) return;
+  dragging = false;
+  ipcRenderer.send('selector-mouseup', {
+    gx: e.clientX + displayBounds.x,
+    gy: e.clientY + displayBounds.y,
+  });
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') ipcRenderer.send('selector-cancel');
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #1e1e2e;
+    color: #cdd6f4;
+    user-select: none;
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+    gap: 10px;
+  }
+  h1 {
+    font-size: 18px;
+    font-weight: 700;
+    text-align: center;
+    color: #cba6f7;
+    -webkit-app-region: drag;
+    padding-bottom: 4px;
+  }
+  .btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: background 0.15s;
+    width: 100%;
+    background: #313244;
+    color: #cdd6f4;
+  }
+  .btn:hover { background: #45475a; }
+  .btn:active { transform: scale(0.97); }
+  .shortcut {
+    margin-left: auto;
+    font-size: 11px;
+    color: #6c7086;
+    background: #1e1e2e;
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+  #window-picker { display: none; flex-direction: column; gap: 6px; }
+  #window-picker.visible { display: flex; }
+  .window-list {
+    background: #181825;
+    border-radius: 8px;
+    padding: 6px;
+    max-height: 180px;
+    overflow-y: auto;
+  }
+  .window-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 7px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 12px;
+  }
+  .window-item:hover { background: #313244; }
+  .window-item img { width: 40px; height: 28px; object-fit: cover; border-radius: 3px; background: #313244; }
+  .window-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .picker-label { font-size: 11px; color: #6c7086; }
+  #status { font-size: 11px; color: #6c7086; text-align: center; min-height: 14px; }
+</style>
+</head>
+<body>
+<h1>📸 ScreenCap</h1>
+<button class="btn" id="btn-area">
+  <span>✂️</span> 範囲選択キャプチャ
+  <span class="shortcut">⌘⌥S</span>
+</button>
+<button class="btn" id="btn-window">
+  <span>🪟</span> ウィンドウキャプチャ
+  <span class="shortcut">⌘⌥W</span>
+</button>
+<hr style="border:none;border-top:1px solid #313244;margin:2px 0">
+<button class="btn" id="btn-projects">
+  <span>📁</span> プロジェクト管理
+</button>
+<div id="status"></div>
+
+<div id="window-picker">
+  <div class="picker-label">キャプチャするウィンドウを選択:</div>
+  <div class="window-list" id="window-list"></div>
+</div>
+
+<script>
+const { ipcRenderer } = require('electron');
+
+const status = document.getElementById('status');
+
+function doAreaCapture() {
+  // メインプロセスが直接セレクターを開く
+  ipcRenderer.send('open-area-capture');
+}
+
+async function doWindowCapture() {
+  status.textContent = 'ウィンドウ一覧を取得中...';
+  try {
+    const sources = await ipcRenderer.invoke('get-window-sources');
+    status.textContent = '';
+    const picker = document.getElementById('window-picker');
+    const list = document.getElementById('window-list');
+    list.innerHTML = '';
+    sources.filter(s => s.name && s.name !== 'ScreenCap').forEach(src => {
+      const item = document.createElement('div');
+      item.className = 'window-item';
+      item.innerHTML = `<img src="${src.thumbnail}" alt=""><span>${src.name}</span>`;
+      item.addEventListener('click', async () => {
+        picker.classList.remove('visible');
+        status.textContent = 'キャプチャ中...';
+        const imgDataUrl = await ipcRenderer.invoke('get-window-hd', src.id);
+        if (imgDataUrl) ipcRenderer.send('open-editor-with-image', imgDataUrl);
+        status.textContent = '';
+      });
+      list.appendChild(item);
+    });
+    picker.classList.add('visible');
+  } catch (e) {
+    status.textContent = 'エラー: ' + e.message;
+  }
+}
+
+document.getElementById('btn-area').addEventListener('click', doAreaCapture);
+document.getElementById('btn-window').addEventListener('click', doWindowCapture);
+document.getElementById('btn-projects').addEventListener('click', () => ipcRenderer.send('open-project-manager'));
+
+// ホットキーからのトリガー
+ipcRenderer.on('trigger-area-capture', () => ipcRenderer.send('open-area-capture'));
+ipcRenderer.on('trigger-window-capture', doWindowCapture);
+</script>
+</body>
+</html>

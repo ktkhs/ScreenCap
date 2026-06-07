@@ -1,0 +1,1193 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #1e1e2e;
+  color: #cdd6f4;
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* ---- Sidebar ---- */
+#sidebar {
+  width: 220px;
+  min-width: 180px;
+  background: #181825;
+  border-right: 1px solid #313244;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+#sidebar-header {
+  padding: 14px 12px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #313244;
+}
+#sidebar-header span { font-size: 13px; font-weight: 600; color: #cba6f7; }
+#btn-new-project {
+  background: #313244;
+  border: none;
+  color: #cdd6f4;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 18px;
+  cursor: pointer;
+  line-height: 1;
+}
+#btn-new-project:hover { background: #45475a; }
+
+#project-list { flex: 1; overflow-y: auto; padding: 6px; }
+.project-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  gap: 8px;
+  position: relative;
+}
+.project-item:hover { background: #313244; }
+.project-item.active { background: #45475a; color: #cba6f7; }
+.project-item .proj-icon { font-size: 14px; flex-shrink: 0; }
+.project-item .proj-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.project-item .proj-count {
+  font-size: 11px;
+  color: #6c7086;
+  background: #1e1e2e;
+  padding: 1px 6px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+.proj-menu-btn {
+  display: none;
+  background: none;
+  border: none;
+  color: #6c7086;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 2px;
+}
+.project-item:hover .proj-menu-btn { display: block; }
+.proj-menu-btn:hover { color: #cdd6f4; }
+
+/* ---- Main panel ---- */
+#main-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+#panel-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid #313244;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+#panel-title {
+  font-size: 15px;
+  font-weight: 600;
+  flex: 1;
+}
+.header-btn {
+  background: #313244;
+  border: none;
+  color: #cdd6f4;
+  border-radius: 7px;
+  padding: 5px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.header-btn:hover { background: #45475a; }
+.header-btn.danger { color: #f38ba8; }
+.header-btn.danger:hover { background: #3d2430; }
+
+/* ---- Content area (preview + grid) ---- */
+#content-area {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* ---- Preview panel ---- */
+#preview-panel {
+  width: 280px;
+  min-width: 160px;
+  max-width: 600px;
+  background: #181825;
+  border-right: none;
+  display: none;
+  flex-direction: column;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+#preview-panel.visible { display: flex; }
+
+/* ---- Resize handle ---- */
+#preview-resize-handle {
+  width: 5px;
+  background: #313244;
+  cursor: col-resize;
+  flex-shrink: 0;
+  display: none;
+  transition: background 0.15s;
+  position: relative;
+}
+#preview-resize-handle::after {
+  content: '';
+  position: absolute;
+  inset: 0 -4px;
+}
+#preview-resize-handle.visible { display: block; }
+#preview-resize-handle:hover,
+#preview-resize-handle.dragging { background: #cba6f7; }
+#preview-img-wrap {
+  background: #11111b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  border-bottom: 1px solid #313244;
+  flex-shrink: 0;
+}
+#preview-img {
+  max-width: 100%;
+  max-height: 200px;
+  object-fit: contain;
+  border-radius: 6px;
+  display: block;
+}
+#preview-info {
+  padding: 12px 14px;
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+#preview-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #cdd6f4;
+  word-break: break-all;
+}
+#preview-date {
+  font-size: 11px;
+  color: #6c7086;
+}
+#preview-memo-label {
+  font-size: 11px;
+  color: #6c7086;
+  margin-top: 4px;
+}
+#preview-memo {
+  font-size: 12px;
+  color: #a6e3a1;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+#preview-actions {
+  padding: 10px 14px;
+  border-top: 1px solid #313244;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.preview-btn {
+  background: #313244;
+  border: none;
+  color: #cdd6f4;
+  border-radius: 7px;
+  padding: 7px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+}
+.preview-btn:hover { background: #45475a; }
+.preview-btn.primary { background: #cba6f7; color: #1e1e2e; font-weight: 600; }
+.preview-btn.primary:hover { background: #b4a0f5; }
+.preview-btn.danger { color: #f38ba8; }
+.preview-btn.danger:hover { background: #3d2430; }
+
+#capture-grid {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+  align-content: start;
+}
+
+.capture-card {
+  background: #181825;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1.5px solid #313244;
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.1s;
+  position: relative;
+}
+.capture-card:hover { border-color: #6c7086; transform: translateY(-1px); }
+.capture-card.selected { border-color: #cba6f7; }
+.capture-card .thumb {
+  width: 100%;
+  aspect-ratio: 4/3;
+  object-fit: cover;
+  display: block;
+  background: #11111b;
+}
+.capture-card .card-body {
+  padding: 7px 9px;
+}
+.capture-card .cap-name {
+  font-size: 12px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.capture-card .cap-date {
+  font-size: 10px;
+  color: #6c7086;
+  margin-top: 2px;
+}
+.capture-card .card-actions {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  display: none;
+  gap: 4px;
+}
+.capture-card:hover .card-actions { display: flex; }
+.card-action-btn {
+  background: rgba(0,0,0,0.7);
+  border: none;
+  color: #cdd6f4;
+  border-radius: 5px;
+  padding: 3px 6px;
+  font-size: 12px;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+}
+.card-action-btn:hover { background: rgba(255,255,255,0.15); }
+.card-action-btn.del:hover { color: #f38ba8; }
+.cap-memo-badge {
+  display: inline-block;
+  font-size: 10px;
+  color: #a6e3a1;
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+#empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: #6c7086;
+  font-size: 14px;
+}
+#empty-state .empty-icon { font-size: 40px; }
+
+/* ---- View toggle ---- */
+.view-toggle {
+  display: flex;
+  background: #181825;
+  border-radius: 7px;
+  padding: 2px;
+  gap: 2px;
+}
+.view-toggle-btn {
+  background: none;
+  border: none;
+  color: #6c7086;
+  border-radius: 5px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.view-toggle-btn.active { background: #313244; color: #cdd6f4; }
+
+/* ---- Tree view ---- */
+#tree-view {
+  flex: 1;
+  position: relative;
+  overflow: auto;
+  background: #11111b;
+  display: none;
+  min-height: 0;
+}
+#tree-canvas {
+  position: relative;
+  min-width: 100%;
+  min-height: 100%;
+  width: 2000px;
+  height: 1500px;
+}
+#tree-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.tree-node {
+  position: absolute;
+  width: 130px;
+  background: #1e1e2e;
+  border: 1.5px solid #313244;
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: move;
+  user-select: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.tree-node:hover { border-color: #6c7086; }
+.tree-node.connect-source { border-color: #cba6f7; box-shadow: 0 0 0 2px rgba(203,166,247,0.3); }
+.tree-node.connect-target-hover { border-color: #a6e3a1; box-shadow: 0 0 0 2px rgba(166,227,161,0.3); }
+.tree-node img {
+  width: 100%;
+  aspect-ratio: 4/3;
+  object-fit: cover;
+  display: block;
+  background: #11111b;
+  pointer-events: none;
+}
+.tree-node .node-label {
+  font-size: 11px;
+  padding: 5px 7px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #cdd6f4;
+}
+.tree-node .node-memo {
+  font-size: 10px;
+  padding: 0 7px 5px;
+  color: #a6e3a1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: none;
+}
+.tree-node .node-memo.has-memo { display: block; }
+.tree-edge {
+  pointer-events: stroke;
+  cursor: pointer;
+  stroke: #585b70;
+  stroke-width: 2;
+  fill: none;
+}
+.tree-edge:hover { stroke: #f38ba8; stroke-width: 3; }
+.tree-edge-hitarea {
+  pointer-events: stroke;
+  cursor: pointer;
+  stroke: transparent;
+  stroke-width: 14;
+  fill: none;
+}
+.connect-btn {
+  background: #313244;
+  border: none;
+  color: #cdd6f4;
+  border-radius: 7px;
+  padding: 5px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.connect-btn.active { background: #cba6f7; color: #1e1e2e; }
+.connect-btn:hover:not(.active) { background: #45475a; }
+#tree-hint {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(49,50,68,0.9);
+  color: #cdd6f4;
+  font-size: 12px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  pointer-events: none;
+  display: none;
+  white-space: nowrap;
+  backdrop-filter: blur(4px);
+}
+
+/* ---- Context menu ---- */
+#ctx-menu {
+  position: fixed;
+  background: #313244;
+  border: 1px solid #45475a;
+  border-radius: 8px;
+  padding: 4px;
+  z-index: 100;
+  display: none;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+  min-width: 140px;
+}
+.ctx-item {
+  padding: 6px 12px;
+  border-radius: 5px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.ctx-item:hover { background: #45475a; }
+.ctx-item.danger { color: #f38ba8; }
+</style>
+</head>
+<body>
+
+<div id="sidebar">
+  <div id="sidebar-header">
+    <span>📁 プロジェクト</span>
+    <button id="btn-new-project" title="新規プロジェクト">＋</button>
+  </div>
+  <div id="project-list"></div>
+</div>
+
+<div id="main-panel">
+  <div id="panel-header">
+    <span id="panel-title" style="color:#6c7086">プロジェクトを選択してください</span>
+    <div class="view-toggle" id="view-toggle" style="display:none">
+      <button class="view-toggle-btn active" data-view="grid">☰ グリッド</button>
+      <button class="view-toggle-btn" data-view="tree">⬡ ツリー</button>
+    </div>
+    <button class="connect-btn" id="btn-connect-mode" style="display:none">🔗 接続</button>
+    <button class="header-btn" id="btn-rename-project" style="display:none">名前を変更</button>
+    <button class="header-btn danger" id="btn-delete-project" style="display:none">削除</button>
+  </div>
+
+  <div id="content-area">
+    <!-- プレビューパネル（左） -->
+    <div id="preview-panel">
+      <div id="preview-img-wrap">
+        <img id="preview-img" src="" alt="">
+      </div>
+      <div id="preview-info">
+        <div id="preview-name"></div>
+        <div id="preview-date"></div>
+        <div id="preview-memo-label" style="display:none">📝 メモ</div>
+        <div id="preview-memo"></div>
+      </div>
+      <div id="preview-actions">
+        <button class="preview-btn primary" id="preview-btn-edit">✏️ エディタで開く</button>
+        <button class="preview-btn" id="preview-btn-memo">📝 メモを編集</button>
+        <button class="preview-btn danger" id="preview-btn-delete">🗑 削除</button>
+      </div>
+    </div>
+
+    <div id="preview-resize-handle"></div>
+
+    <!-- グリッド / ツリー / 空 -->
+    <div id="capture-grid"></div>
+    <div id="tree-view">
+      <div id="tree-canvas">
+        <svg id="tree-svg" width="2000" height="1500"></svg>
+      </div>
+      <div id="tree-hint"></div>
+    </div>
+    <div id="empty-state">
+      <div class="empty-icon">📂</div>
+      <div>プロジェクトを選択してください</div>
+    </div>
+  </div>
+</div>
+
+<div id="ctx-menu">
+  <div class="ctx-item" id="ctx-rename">名前を変更</div>
+  <div class="ctx-item danger" id="ctx-delete">削除</div>
+</div>
+
+<!-- メモモーダル -->
+<div id="memo-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:200;align-items:center;justify-content:center;">
+  <div style="background:#1e1e2e;border:1px solid #313244;border-radius:12px;padding:20px;width:360px;display:flex;flex-direction:column;gap:12px;">
+    <div style="font-size:14px;font-weight:600;color:#cba6f7">📝 メモを編集</div>
+    <div id="memo-modal-capname" style="font-size:12px;color:#6c7086"></div>
+    <textarea id="memo-modal-field"
+      style="background:#313244;color:#cdd6f4;border:none;border-radius:7px;padding:8px 10px;font-size:13px;width:100%;height:120px;resize:vertical;outline:none;font-family:inherit;line-height:1.6"
+      placeholder="メモを入力..."></textarea>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button id="memo-modal-cancel" style="background:#313244;border:none;color:#cdd6f4;border-radius:7px;padding:6px 16px;font-size:13px;cursor:pointer">キャンセル</button>
+      <button id="memo-modal-ok" style="background:#cba6f7;border:none;color:#1e1e2e;border-radius:7px;padding:6px 16px;font-size:13px;font-weight:600;cursor:pointer">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 汎用インプットモーダル -->
+<div id="input-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:200;align-items:center;justify-content:center;">
+  <div style="background:#1e1e2e;border:1px solid #313244;border-radius:12px;padding:20px;width:300px;display:flex;flex-direction:column;gap:12px;">
+    <div id="input-modal-title" style="font-size:14px;font-weight:600;color:#cba6f7"></div>
+    <input id="input-modal-field" type="text"
+      style="background:#313244;color:#cdd6f4;border:none;border-radius:7px;padding:8px 10px;font-size:13px;width:100%;outline:none;">
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button id="input-modal-cancel" style="background:#313244;border:none;color:#cdd6f4;border-radius:7px;padding:6px 16px;font-size:13px;cursor:pointer">キャンセル</button>
+      <button id="input-modal-ok" style="background:#cba6f7;border:none;color:#1e1e2e;border-radius:7px;padding:6px 16px;font-size:13px;font-weight:600;cursor:pointer">OK</button>
+    </div>
+  </div>
+</div>
+
+<!-- 確認モーダル -->
+<div id="confirm-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:200;align-items:center;justify-content:center;">
+  <div style="background:#1e1e2e;border:1px solid #313244;border-radius:12px;padding:20px;width:300px;display:flex;flex-direction:column;gap:12px;">
+    <div id="confirm-modal-msg" style="font-size:13px;color:#cdd6f4;line-height:1.6"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button id="confirm-modal-cancel" style="background:#313244;border:none;color:#cdd6f4;border-radius:7px;padding:6px 16px;font-size:13px;cursor:pointer">キャンセル</button>
+      <button id="confirm-modal-ok" style="background:#f38ba8;border:none;color:#1e1e2e;border-radius:7px;padding:6px 16px;font-size:13px;font-weight:600;cursor:pointer">削除</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const { ipcRenderer } = require('electron');
+
+let projects = [];
+let currentProjectId = null;
+let ctxTargetId = null;
+let treeCaptures = [];
+
+// ---- ビュー切り替え ----
+let currentView = 'grid'; // 'grid' | 'tree'
+
+document.getElementById('view-toggle').addEventListener('click', e => {
+  const btn = e.target.closest('.view-toggle-btn');
+  if (!btn) return;
+  const view = btn.dataset.view;
+  if (view === currentView) return;
+  currentView = view;
+  document.querySelectorAll('.view-toggle-btn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+  document.getElementById('capture-grid').style.display = view === 'grid' ? '' : 'none';
+  document.getElementById('tree-view').style.display  = view === 'tree' ? 'block' : 'none';
+  document.getElementById('btn-connect-mode').style.display = view === 'tree' && currentProjectId ? '' : 'none';
+  if (view === 'tree') renderTree();
+});
+
+// ---- ツリービュー ----
+let treeData = { nodes: {}, edges: [] }; // { nodes: {capId: {x,y}}, edges: [{from,to}] }
+let connectMode = false;
+let connectSource = null;
+
+// ---- プレビューパネル リサイズ ----
+const previewResizeHandle = document.getElementById('preview-resize-handle');
+const previewPanelEl = document.getElementById('preview-panel');
+let isResizingPreview = false;
+
+previewResizeHandle.addEventListener('mousedown', e => {
+  isResizingPreview = true;
+  previewResizeHandle.classList.add('dragging');
+  document.body.style.cursor = 'col-resize';
+  document.body.style.userSelect = 'none';
+  e.preventDefault();
+});
+
+window.addEventListener('mousemove', e => {
+  if (!isResizingPreview) return;
+  const contentRect = document.getElementById('content-area').getBoundingClientRect();
+  const newWidth = Math.max(160, Math.min(600, e.clientX - contentRect.left));
+  previewPanelEl.style.width = newWidth + 'px';
+});
+
+window.addEventListener('mouseup', () => {
+  if (!isResizingPreview) return;
+  isResizingPreview = false;
+  previewResizeHandle.classList.remove('dragging');
+  document.body.style.cursor = '';
+  document.body.style.userSelect = '';
+});
+
+// グローバルドラッグ状態（renderTree ごとにリスナーが増えないよう一元管理）
+let treeDrag = null; // { capId, startX, startY, nodeStartX, nodeStartY, nodeEl }
+
+window.addEventListener('mousemove', e => {
+  if (!treeDrag) return;
+  const dx = e.clientX - treeDrag.startX;
+  const dy = e.clientY - treeDrag.startY;
+  const nx = Math.max(0, treeDrag.nodeStartX + dx);
+  const ny = Math.max(0, treeDrag.nodeStartY + dy);
+  treeData.nodes[treeDrag.capId] = { x: nx, y: ny };
+  treeDrag.nodeEl.style.left = nx + 'px';
+  treeDrag.nodeEl.style.top  = ny + 'px';
+  redrawEdges();
+});
+
+window.addEventListener('mouseup', () => {
+  if (!treeDrag) return;
+  treeDrag = null;
+  saveTreeData();
+});
+
+const btnConnect = document.getElementById('btn-connect-mode');
+btnConnect.addEventListener('click', () => {
+  connectMode = !connectMode;
+  connectSource = null;
+  btnConnect.classList.toggle('active', connectMode);
+  btnConnect.textContent = connectMode ? '✕ キャンセル' : '🔗 接続';
+  showTreeHint(connectMode ? '接続元のノードをクリックしてください' : '');
+  document.querySelectorAll('.tree-node').forEach(n => {
+    n.classList.remove('connect-source', 'connect-target-hover');
+  });
+});
+
+async function loadTreeData() {
+  treeData = await ipcRenderer.invoke('pm-get-tree', currentProjectId);
+}
+
+async function saveTreeData() {
+  await ipcRenderer.invoke('pm-save-tree', { pid: currentProjectId, data: treeData });
+}
+
+async function renderTree() {
+  if (!currentProjectId) return;
+  await loadTreeData();
+  const canvas = document.getElementById('tree-canvas');
+  const svg = document.getElementById('tree-svg');
+  // .tree-node だけ削除（SVG は残す）
+  canvas.querySelectorAll('.tree-node').forEach(n => n.remove());
+  svg.innerHTML = '';
+
+  // 新規ノードは初期位置を割り当て
+  treeCaptures.forEach((cap, i) => {
+    if (!treeData.nodes[cap.id]) {
+      const cols = 4;
+      treeData.nodes[cap.id] = {
+        x: 30 + (i % cols) * 170,
+        y: 30 + Math.floor(i / cols) * 200,
+      };
+    }
+  });
+
+  // ノード描画
+  treeCaptures.forEach(cap => {
+    const pos = treeData.nodes[cap.id];
+    const node = document.createElement('div');
+    node.className = 'tree-node';
+    node.dataset.id = cap.id;
+    node.style.left = pos.x + 'px';
+    node.style.top  = pos.y + 'px';
+    node.innerHTML = `
+      <img src="" alt="" data-path="${cap.filePath}">
+      <div class="node-label" title="${esc(cap.name)}">${esc(cap.name)}</div>
+      <div class="node-memo${cap.memo ? ' has-memo' : ''}">${cap.memo ? esc(cap.memo) : ''}</div>`;
+
+    ipcRenderer.invoke('pm-read-image', cap.filePath).then(url => {
+      if (url) node.querySelector('img').src = url;
+    });
+
+    // ドラッグ移動（グローバルリスナーに委譲）
+    node.addEventListener('mousedown', e => {
+      if (connectMode) return;
+      if (e.button !== 0) return;
+      const pos = treeData.nodes[cap.id];
+      treeDrag = { capId: cap.id, startX: e.clientX, startY: e.clientY, nodeStartX: pos.x, nodeStartY: pos.y, nodeEl: node };
+      e.preventDefault();
+    });
+
+    // 接続モード クリック
+    node.addEventListener('click', e => {
+      if (!connectMode) return;
+      e.stopPropagation();
+      if (!connectSource) {
+        connectSource = cap.id;
+        node.classList.add('connect-source');
+        showTreeHint('接続先のノードをクリックしてください');
+      } else if (connectSource !== cap.id) {
+        const from = connectSource, to = cap.id;
+        const dup = treeData.edges.some(edge =>
+          (edge.from === from && edge.to === to) || (edge.from === to && edge.to === from));
+        if (!dup) {
+          treeData.edges.push({ from, to });
+          saveTreeData();
+          redrawEdges();
+        }
+        document.querySelectorAll('.tree-node').forEach(n => n.classList.remove('connect-source', 'connect-target-hover'));
+        connectSource = null;
+        showTreeHint('接続元のノードをクリックしてください');
+      }
+    });
+
+    node.addEventListener('mouseenter', () => {
+      if (connectMode && connectSource && connectSource !== cap.id) {
+        node.classList.add('connect-target-hover');
+      }
+    });
+    node.addEventListener('mouseleave', () => {
+      node.classList.remove('connect-target-hover');
+    });
+
+    canvas.appendChild(node);
+  });
+
+  redrawEdges();
+}
+
+function getNodeCenter(id) {
+  const node = document.querySelector(`.tree-node[data-id="${id}"]`);
+  if (!node) return null;
+  const pos = treeData.nodes[id];
+  return { x: pos.x + 65, y: pos.y + 60 };
+}
+
+function redrawEdges() {
+  const svg = document.getElementById('tree-svg');
+  svg.innerHTML = '';
+  treeData.edges.forEach((edge, idx) => {
+    const a = getNodeCenter(edge.from);
+    const b = getNodeCenter(edge.to);
+    if (!a || !b) return;
+
+    // ベジェ曲線のコントロールポイント
+    const mx = (a.x + b.x) / 2;
+
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+
+    const hitarea = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    hitarea.setAttribute('class', 'tree-edge-hitarea');
+    hitarea.setAttribute('d', `M${a.x},${a.y} C${mx},${a.y} ${mx},${b.y} ${b.x},${b.y}`);
+
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    line.setAttribute('class', 'tree-edge');
+    line.setAttribute('d', `M${a.x},${a.y} C${mx},${a.y} ${mx},${b.y} ${b.x},${b.y}`);
+
+    // 矢印マーカー
+    const defs = svg.querySelector('defs') || (() => { const d = document.createElementNS('http://www.w3.org/2000/svg','defs'); svg.appendChild(d); return d; })();
+    const markerId = `arrow-${idx}`;
+    defs.innerHTML += `<marker id="${markerId}" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#585b70"/>
+    </marker>`;
+    line.setAttribute('marker-end', `url(#${markerId})`);
+
+    g.appendChild(hitarea);
+    g.appendChild(line);
+
+    // クリックで削除
+    g.addEventListener('click', async () => {
+      treeData.edges.splice(idx, 1);
+      await saveTreeData();
+      redrawEdges();
+    });
+
+    svg.appendChild(g);
+  });
+}
+
+function showTreeHint(msg) {
+  const hint = document.getElementById('tree-hint');
+  hint.textContent = msg;
+  hint.style.display = msg ? 'block' : 'none';
+}
+
+// ---- メモモーダル ----
+function showMemoModal(cap) {
+  return new Promise(resolve => {
+    const modal = document.getElementById('memo-modal');
+    const field = document.getElementById('memo-modal-field');
+    document.getElementById('memo-modal-capname').textContent = cap.name;
+    field.value = cap.memo || '';
+    modal.style.display = 'flex';
+    setTimeout(() => field.focus(), 50);
+
+    function cleanup(save) {
+      modal.style.display = 'none';
+      document.getElementById('memo-modal-ok').removeEventListener('click', onOk);
+      document.getElementById('memo-modal-cancel').removeEventListener('click', onCancel);
+      field.removeEventListener('keydown', onKey);
+      resolve(save ? field.value.trim() : null);
+    }
+    function onOk() { cleanup(true); }
+    function onCancel() { cleanup(false); }
+    function onKey(e) {
+      if (e.key === 'Escape') { e.preventDefault(); cleanup(false); }
+    }
+    document.getElementById('memo-modal-ok').addEventListener('click', onOk);
+    document.getElementById('memo-modal-cancel').addEventListener('click', onCancel);
+    field.addEventListener('keydown', onKey);
+  }).then(async memo => {
+    if (memo === null) return;
+    await ipcRenderer.invoke('pm-save-memo', { pid: currentProjectId, cid: cap.id, memo });
+    await loadCaptures();
+  });
+}
+
+// ---- カスタムモーダルヘルパー ----
+function showInputModal(title, defaultValue) {
+  return new Promise(resolve => {
+    const modal = document.getElementById('input-modal');
+    const field = document.getElementById('input-modal-field');
+    document.getElementById('input-modal-title').textContent = title;
+    field.value = defaultValue || '';
+    modal.style.display = 'flex';
+    setTimeout(() => { field.focus(); field.select(); }, 50);
+
+    function cleanup(result) {
+      modal.style.display = 'none';
+      document.getElementById('input-modal-ok').removeEventListener('click', onOk);
+      document.getElementById('input-modal-cancel').removeEventListener('click', onCancel);
+      field.removeEventListener('keydown', onKey);
+      resolve(result);
+    }
+    function onOk() { cleanup(field.value.trim() || null); }
+    function onCancel() { cleanup(null); }
+    function onKey(e) {
+      if (e.key === 'Enter') { e.preventDefault(); cleanup(field.value.trim() || null); }
+      if (e.key === 'Escape') { e.preventDefault(); cleanup(null); }
+    }
+    document.getElementById('input-modal-ok').addEventListener('click', onOk);
+    document.getElementById('input-modal-cancel').addEventListener('click', onCancel);
+    field.addEventListener('keydown', onKey);
+  });
+}
+
+function showConfirmModal(message) {
+  return new Promise(resolve => {
+    const modal = document.getElementById('confirm-modal');
+    document.getElementById('confirm-modal-msg').textContent = message;
+    modal.style.display = 'flex';
+
+    function cleanup(result) {
+      modal.style.display = 'none';
+      document.getElementById('confirm-modal-ok').removeEventListener('click', onOk);
+      document.getElementById('confirm-modal-cancel').removeEventListener('click', onCancel);
+      resolve(result);
+    }
+    function onOk() { cleanup(true); }
+    function onCancel() { cleanup(false); }
+    document.getElementById('confirm-modal-ok').addEventListener('click', onOk);
+    document.getElementById('confirm-modal-cancel').addEventListener('click', onCancel);
+  });
+}
+
+// ---- Init ----
+async function init() {
+  projects = await ipcRenderer.invoke('pm-get-projects');
+  renderProjects();
+  if (projects.length > 0) selectProject(projects[0].id);
+}
+
+// ---- Projects ----
+function renderProjects() {
+  const list = document.getElementById('project-list');
+  list.innerHTML = '';
+  if (projects.length === 0) {
+    list.innerHTML = '<div style="padding:12px;color:#6c7086;font-size:12px;text-align:center">プロジェクトがありません</div>';
+    return;
+  }
+  projects.forEach(p => {
+    const div = document.createElement('div');
+    div.className = 'project-item' + (p.id === currentProjectId ? ' active' : '');
+    div.dataset.id = p.id;
+    div.innerHTML = `
+      <span class="proj-icon">📁</span>
+      <span class="proj-name">${esc(p.name)}</span>
+      <span class="proj-count" id="count-${p.id}">0</span>
+      <button class="proj-menu-btn" data-id="${p.id}" title="メニュー">⋯</button>`;
+    div.addEventListener('click', (e) => {
+      if (!e.target.classList.contains('proj-menu-btn')) selectProject(p.id);
+    });
+    div.querySelector('.proj-menu-btn').addEventListener('click', e => {
+      e.stopPropagation();
+      showCtxMenu(e, p.id);
+    });
+    list.appendChild(div);
+  });
+  updateCounts();
+}
+
+async function updateCounts() {
+  await Promise.all(projects.map(async p => {
+    const caps = await ipcRenderer.invoke('pm-get-captures', p.id);
+    const el = document.getElementById(`count-${p.id}`);
+    if (el) el.textContent = caps.length;
+  }));
+}
+
+async function selectProject(id) {
+  currentProjectId = id;
+  hidePreview();
+  connectMode = false;
+  connectSource = null;
+  document.getElementById('btn-connect-mode').classList.remove('active');
+  document.getElementById('btn-connect-mode').textContent = '🔗 接続';
+  renderProjects();
+  const p = projects.find(x => x.id === id);
+  document.getElementById('panel-title').textContent = p ? p.name : '';
+  document.getElementById('panel-title').style.color = '';
+  document.getElementById('view-toggle').style.display = '';
+  document.getElementById('btn-rename-project').style.display = '';
+  document.getElementById('btn-delete-project').style.display = '';
+  document.getElementById('btn-connect-mode').style.display = currentView === 'tree' ? '' : 'none';
+  await loadCaptures();
+}
+
+async function loadCaptures() {
+  if (!currentProjectId) return;
+  const captures = await ipcRenderer.invoke('pm-get-captures', currentProjectId);
+  treeCaptures = captures;
+  renderCaptures(captures);
+  if (currentView === 'tree') renderTree();
+}
+
+// ---- プレビューパネル ----
+let selectedCapId = null;
+
+function showPreview(cap, dataUrl) {
+  selectedCapId = cap.id;
+  const panel = document.getElementById('preview-panel');
+  panel.classList.add('visible');
+  previewResizeHandle.classList.add('visible');
+
+  document.getElementById('preview-img').src = dataUrl || '';
+  document.getElementById('preview-name').textContent = cap.name;
+  document.getElementById('preview-date').textContent =
+    new Date(cap.createdAt).toLocaleDateString('ja-JP', { year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+
+  const memoLabel = document.getElementById('preview-memo-label');
+  const memoEl = document.getElementById('preview-memo');
+  if (cap.memo) {
+    memoLabel.style.display = '';
+    memoEl.textContent = cap.memo;
+  } else {
+    memoLabel.style.display = 'none';
+    memoEl.textContent = '';
+  }
+
+  // ボタンのイベントを毎回張り替え
+  const btnEdit = document.getElementById('preview-btn-edit');
+  const btnMemo = document.getElementById('preview-btn-memo');
+  const btnDel  = document.getElementById('preview-btn-delete');
+  btnEdit.onclick = () => ipcRenderer.send('pm-open-in-editor', cap.filePath);
+  btnMemo.onclick = async () => {
+    await showMemoModal(cap);
+    // メモ更新後にキャプチャを再取得してプレビューを更新
+    const updated = treeCaptures.find(c => c.id === cap.id);
+    if (updated) showPreview(updated, document.getElementById('preview-img').src);
+  };
+  btnDel.onclick = async () => {
+    const ok = await showConfirmModal(`「${cap.name}」を削除しますか？`);
+    if (!ok) return;
+    await ipcRenderer.invoke('pm-delete-capture', { pid: currentProjectId, cid: cap.id });
+    hidePreview();
+    await loadCaptures();
+    updateCounts();
+  };
+
+  // 選択中カードをハイライト
+  document.querySelectorAll('.capture-card').forEach(c =>
+    c.classList.toggle('selected', c.dataset.id === cap.id));
+}
+
+function hidePreview() {
+  selectedCapId = null;
+  document.getElementById('preview-panel').classList.remove('visible');
+  previewResizeHandle.classList.remove('visible');
+  document.querySelectorAll('.capture-card').forEach(c => c.classList.remove('selected'));
+}
+
+function renderCaptures(captures) {
+  const grid = document.getElementById('capture-grid');
+  const empty = document.getElementById('empty-state');
+  grid.innerHTML = '';
+
+  if (captures.length === 0) {
+    hidePreview();
+    empty.style.display = 'flex';
+    empty.innerHTML = `<div class="empty-icon">🖼️</div><div>キャプチャがまだありません</div><div style="font-size:12px;color:#585b70">エディタの「プロジェクトに保存」から追加できます</div>`;
+    return;
+  }
+  empty.style.display = 'none';
+
+  captures.forEach(cap => {
+    const card = document.createElement('div');
+    card.className = 'capture-card' + (cap.id === selectedCapId ? ' selected' : '');
+    card.dataset.id = cap.id;
+    const date = new Date(cap.createdAt).toLocaleDateString('ja-JP', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+    card.innerHTML = `
+      <img class="thumb" src="" alt="">
+      <div class="card-body">
+        <div class="cap-name" title="${esc(cap.name)}">${esc(cap.name)}</div>
+        <div class="cap-date">${date}</div>
+        ${cap.memo ? `<div class="cap-memo-badge" title="${esc(cap.memo)}">📝 ${esc(cap.memo)}</div>` : ''}
+      </div>
+      <div class="card-actions">
+        <button class="card-action-btn" data-action="memo" title="メモ">📝</button>
+        <button class="card-action-btn" data-action="edit" title="エディタで開く">✏️</button>
+        <button class="card-action-btn del" data-action="delete" title="削除">🗑</button>
+      </div>`;
+
+    const img = card.querySelector('.thumb');
+    let cachedDataUrl = null;
+    ipcRenderer.invoke('pm-read-image', cap.filePath).then(dataUrl => {
+      if (dataUrl) { img.src = dataUrl; cachedDataUrl = dataUrl; }
+      // このカードが選択中なら画像も更新
+      if (cap.id === selectedCapId) showPreview(cap, dataUrl);
+    });
+
+    card.querySelector('[data-action="memo"]').addEventListener('click', e => {
+      e.stopPropagation();
+      showMemoModal(cap);
+    });
+    card.querySelector('[data-action="edit"]').addEventListener('click', e => {
+      e.stopPropagation();
+      ipcRenderer.send('pm-open-in-editor', cap.filePath);
+    });
+    card.querySelector('[data-action="delete"]').addEventListener('click', async e => {
+      e.stopPropagation();
+      const ok = await showConfirmModal(`「${cap.name}」を削除しますか？`);
+      if (!ok) return;
+      await ipcRenderer.invoke('pm-delete-capture', { pid: currentProjectId, cid: cap.id });
+      if (cap.id === selectedCapId) hidePreview();
+      await loadCaptures();
+      updateCounts();
+    });
+
+    // シングルクリック → プレビュー、ダブルクリック → エディタ
+    let clickTimer = null;
+    card.addEventListener('click', () => {
+      if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; return; }
+      clickTimer = setTimeout(() => {
+        clickTimer = null;
+        showPreview(cap, cachedDataUrl);
+      }, 220);
+    });
+    card.addEventListener('dblclick', () => {
+      if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
+      ipcRenderer.send('pm-open-in-editor', cap.filePath);
+    });
+
+    grid.appendChild(card);
+  });
+}
+
+// ---- New project ----
+document.getElementById('btn-new-project').addEventListener('click', async () => {
+  const name = await showInputModal('新規プロジェクト名', `プロジェクト ${projects.length + 1}`);
+  if (!name) return;
+  const id = await ipcRenderer.invoke('pm-create-project', name);
+  projects = await ipcRenderer.invoke('pm-get-projects');
+  renderProjects();
+  selectProject(id);
+});
+
+// ---- Rename / Delete project ----
+document.getElementById('btn-rename-project').addEventListener('click', () => renameCurrentProject());
+document.getElementById('btn-delete-project').addEventListener('click', () => deleteCurrentProject());
+
+async function renameCurrentProject() {
+  const p = projects.find(x => x.id === currentProjectId);
+  if (!p) return;
+  const name = await showInputModal('名前を変更', p.name);
+  if (!name || name === p.name) return;
+  await ipcRenderer.invoke('pm-rename-project', { id: p.id, name });
+  projects = await ipcRenderer.invoke('pm-get-projects');
+  renderProjects();
+  document.getElementById('panel-title').textContent = name;
+}
+
+async function deleteCurrentProject() {
+  const p = projects.find(x => x.id === currentProjectId);
+  if (!p) return;
+  const ok = await showConfirmModal(`プロジェクト「${p.name}」とすべてのキャプチャを削除しますか？`);
+  if (!ok) return;
+  await ipcRenderer.invoke('pm-delete-project', p.id);
+  projects = await ipcRenderer.invoke('pm-get-projects');
+  currentProjectId = null;
+  treeCaptures = [];
+  document.getElementById('panel-title').textContent = 'プロジェクトを選択してください';
+  document.getElementById('panel-title').style.color = '#6c7086';
+  document.getElementById('view-toggle').style.display = 'none';
+  document.getElementById('btn-connect-mode').style.display = 'none';
+  document.getElementById('btn-rename-project').style.display = 'none';
+  document.getElementById('btn-delete-project').style.display = 'none';
+  document.getElementById('capture-grid').innerHTML = '';
+  document.getElementById('tree-view').style.display = 'none';
+  document.getElementById('tree-canvas').innerHTML = '';
+  document.getElementById('tree-svg').innerHTML = '';
+  document.getElementById('empty-state').style.display = 'flex';
+  document.getElementById('empty-state').innerHTML = `<div class="empty-icon">📂</div><div>プロジェクトを選択してください</div>`;
+  renderProjects();
+}
+
+// ---- Context menu ----
+const ctxMenu = document.getElementById('ctx-menu');
+
+function showCtxMenu(e, id) {
+  ctxTargetId = id;
+  ctxMenu.style.display = 'block';
+  ctxMenu.style.left = e.clientX + 'px';
+  ctxMenu.style.top  = e.clientY + 'px';
+}
+
+document.addEventListener('click', () => { ctxMenu.style.display = 'none'; });
+
+document.getElementById('ctx-rename').addEventListener('click', async () => {
+  const p = projects.find(x => x.id === ctxTargetId);
+  if (!p) return;
+  const name = await showInputModal('名前を変更', p.name);
+  if (!name) return;
+  await ipcRenderer.invoke('pm-rename-project', { id: p.id, name });
+  projects = await ipcRenderer.invoke('pm-get-projects');
+  renderProjects();
+  if (ctxTargetId === currentProjectId) document.getElementById('panel-title').textContent = name;
+});
+
+document.getElementById('ctx-delete').addEventListener('click', async () => {
+  const p = projects.find(x => x.id === ctxTargetId);
+  if (!p) return;
+  const ok = await showConfirmModal(`「${p.name}」を削除しますか？`);
+  if (!ok) return;
+  await ipcRenderer.invoke('pm-delete-project', p.id);
+  projects = await ipcRenderer.invoke('pm-get-projects');
+  if (currentProjectId === ctxTargetId) {
+    currentProjectId = null;
+    treeCaptures = [];
+    document.getElementById('capture-grid').innerHTML = '';
+    document.getElementById('tree-view').style.display = 'none';
+    document.getElementById('tree-canvas').innerHTML = '';
+    document.getElementById('tree-svg').innerHTML = '';
+    document.getElementById('panel-title').textContent = 'プロジェクトを選択してください';
+    document.getElementById('panel-title').style.color = '#6c7086';
+    document.getElementById('view-toggle').style.display = 'none';
+    document.getElementById('btn-connect-mode').style.display = 'none';
+    document.getElementById('btn-rename-project').style.display = 'none';
+    document.getElementById('btn-delete-project').style.display = 'none';
+    document.getElementById('empty-state').style.display = 'flex';
+  }
+  renderProjects();
+});
+
+// エディタでプロジェクト保存後にリフレッシュ
+ipcRenderer.on('pm-refresh', async () => {
+  await loadCaptures();
+  updateCounts();
+});
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+init();
+</script>
+</body>
+</html>
