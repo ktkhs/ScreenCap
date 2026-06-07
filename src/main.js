@@ -7,39 +7,54 @@ require('@electron/remote/main').initialize();
 // Map<cap_id, {project_id, project_name, cap_name, memo, ocr_text, filename, created_at}>
 const searchIndex = new Map();
 
+function searchIndexFile() { return path.join(dataDir, 'search-index.json'); }
+
+let _saveIndexTimer = null;
+function persistIndex() {
+  clearTimeout(_saveIndexTimer);
+  _saveIndexTimer = setTimeout(() => {
+    const obj = Object.fromEntries(searchIndex);
+    fs.promises.writeFile(searchIndexFile(), JSON.stringify(obj)).catch(() => {});
+  }, 500);
+}
+
 function dbUpsert(row) {
   searchIndex.set(row.cap_id, row);
+  persistIndex();
 }
 
 function dbDeleteCapture(cid) {
   searchIndex.delete(cid);
+  persistIndex();
 }
 
 function dbDeleteProject(pid) {
   for (const [cid, row] of searchIndex) {
     if (row.project_id === pid) searchIndex.delete(cid);
   }
+  persistIndex();
 }
 
 function dbUpdateCapName(cid, name) {
   const row = searchIndex.get(cid);
-  if (row) row.cap_name = name;
+  if (row) { row.cap_name = name; persistIndex(); }
 }
 
 function dbUpdateMemo(cid, memo) {
   const row = searchIndex.get(cid);
-  if (row) row.memo = memo;
+  if (row) { row.memo = memo; persistIndex(); }
 }
 
 function dbUpdateProjectName(pid, name) {
   for (const row of searchIndex.values()) {
     if (row.project_id === pid) row.project_name = name;
   }
+  persistIndex();
 }
 
 function dbUpdateOcrText(cid, ocrText) {
   const row = searchIndex.get(cid);
-  if (row) row.ocr_text = ocrText;
+  if (row) { row.ocr_text = ocrText; persistIndex(); }
 }
 
 function dbSearch(query) {
@@ -72,6 +87,18 @@ async function rebuildIndex() {
     }
   }
   console.log(`[ScreenCap] Search index built: ${searchIndex.size} captures`);
+}
+
+async function loadOrBuildIndex() {
+  try {
+    const raw = await fs.promises.readFile(searchIndexFile(), 'utf8');
+    const obj = JSON.parse(raw);
+    for (const [k, v] of Object.entries(obj)) searchIndex.set(k, v);
+    console.log(`[ScreenCap] Index loaded from cache: ${searchIndex.size} captures`);
+  } catch {
+    await rebuildIndex();
+    persistIndex();
+  }
 }
 
 let mainWindow = null;
@@ -832,14 +859,14 @@ function showMainWindow() {
 
 // ---- アプリライフサイクル ----
 
-app.whenReady().then(async () => {
+app.whenReady().then(() => {
   dataDir = path.join(app.getPath('userData'), 'screencap');
   fs.mkdirSync(dataDir, { recursive: true });
-  await rebuildIndex();
-  initOcr().catch(e => console.error('[ScreenCap] OCR init failed:', e.message));
   createMainWindow();
   createTray();
   registerHotkeys();
+  loadOrBuildIndex().catch(e => console.error('[ScreenCap] Index load error:', e));
+  initOcr().catch(e => console.error('[ScreenCap] OCR init failed:', e.message));
   app.on('activate', () => {
     // macOS: Dock アイコンクリックで再表示
     showMainWindow();

@@ -145,6 +145,20 @@ body {
   border-radius: 2px;
   padding: 0 1px;
 }
+.result-ocr {
+  font-size: 11px;
+  color: #89b4fa;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.result-ocr mark {
+  background: rgba(137,180,250,0.2);
+  color: #89b4fa;
+  border-radius: 2px;
+  padding: 0 1px;
+}
 .result-arrow {
   color: #45475a;
   flex-shrink: 0;
@@ -170,7 +184,7 @@ body {
     <circle cx="6.5" cy="6.5" r="4.5"/>
     <line x1="10" y1="10" x2="14" y2="14"/>
   </svg>
-  <input id="search-input" type="text" placeholder="キャプチャ名・メモ・プロジェクト名で検索..." autofocus>
+  <input id="search-input" type="text" placeholder="キャプチャ名・メモ・プロジェクト名・画像テキストで検索..." autofocus>
   <span id="result-count"></span>
 </div>
 
@@ -261,6 +275,15 @@ function filterAndRender() {
       ? `<div class="result-memo">${highlight(matchedMemo, query)}</div>`
       : (r.memo ? `<div class="result-memo">${esc(r.memo)}</div>` : '');
 
+    let ocrHtml = '';
+    if (matchField(r.ocrText, query)) {
+      const idx = r.ocrText.toLowerCase().indexOf(query.toLowerCase());
+      const start = Math.max(0, idx - 30);
+      const end = Math.min(r.ocrText.length, idx + query.length + 30);
+      const snippet = (start > 0 ? '…' : '') + r.ocrText.slice(start, end) + (end < r.ocrText.length ? '…' : '');
+      ocrHtml = `<div class="result-ocr">📄 ${highlight(snippet, query)}</div>`;
+    }
+
     item.innerHTML = `
       <img class="result-thumb" src="" data-path="${esc(r.filePath)}" alt="">
       <div class="result-body">
@@ -270,6 +293,7 @@ function filterAndRender() {
           ${new Date(r.createdAt).toLocaleDateString('ja-JP', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })}
         </div>
         ${memoHtml}
+        ${ocrHtml}
       </div>
       <svg class="result-arrow" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="4" y1="8" x2="12" y2="8"/><polyline points="9,5 12,8 9,11"/></svg>
     `;
