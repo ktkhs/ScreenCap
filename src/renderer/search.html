@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #1e1e2e;
+  color: #cdd6f4;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* 検索バー */
+#search-bar {
+  padding: 12px 14px;
+  background: #181825;
+  border-bottom: 1px solid #313244;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  -webkit-app-region: drag;
+}
+#search-bar svg { flex-shrink: 0; -webkit-app-region: no-drag; }
+#search-input {
+  flex: 1;
+  background: #313244;
+  border: 1px solid #45475a;
+  border-radius: 7px;
+  color: #cdd6f4;
+  font-size: 14px;
+  padding: 7px 12px;
+  outline: none;
+  -webkit-app-region: no-drag;
+}
+#search-input:focus { border-color: #cba6f7; }
+#search-input::placeholder { color: #585b70; }
+#result-count {
+  font-size: 11px;
+  color: #6c7086;
+  white-space: nowrap;
+  -webkit-app-region: no-drag;
+}
+
+/* フィルター */
+#filter-bar {
+  padding: 6px 14px;
+  background: #181825;
+  border-bottom: 1px solid #313244;
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.filter-chip {
+  background: #313244;
+  border: 1px solid #45475a;
+  color: #a6adc8;
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  cursor: pointer;
+  user-select: none;
+}
+.filter-chip.active {
+  background: #cba6f7;
+  border-color: #cba6f7;
+  color: #1e1e2e;
+  font-weight: 600;
+}
+
+/* 結果リスト */
+#results {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+#results::-webkit-scrollbar { width: 6px; }
+#results::-webkit-scrollbar-track { background: transparent; }
+#results::-webkit-scrollbar-thumb { background: #45475a; border-radius: 3px; }
+
+.result-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  cursor: pointer;
+  border-bottom: 1px solid #1e1e2e;
+  transition: background 0.1s;
+}
+.result-item:hover { background: #313244; }
+
+.result-thumb {
+  width: 64px;
+  height: 44px;
+  object-fit: cover;
+  border-radius: 5px;
+  background: #313244;
+  flex-shrink: 0;
+}
+.result-body { flex: 1; min-width: 0; }
+.result-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #cdd6f4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.result-name mark {
+  background: rgba(203,166,247,0.3);
+  color: #cba6f7;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+.result-meta {
+  font-size: 11px;
+  color: #6c7086;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.result-meta .proj-tag {
+  background: #313244;
+  border-radius: 4px;
+  padding: 1px 6px;
+  margin-right: 6px;
+  color: #a6adc8;
+}
+.result-memo {
+  font-size: 11px;
+  color: #a6e3a1;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.result-memo mark {
+  background: rgba(166,227,161,0.2);
+  color: #a6e3a1;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+.result-arrow {
+  color: #45475a;
+  flex-shrink: 0;
+}
+
+/* 空・ローディング */
+#empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #585b70;
+  font-size: 13px;
+  gap: 10px;
+}
+</style>
+</head>
+<body>
+
+<div id="search-bar">
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#6c7086" stroke-width="1.5" stroke-linecap="round">
+    <circle cx="6.5" cy="6.5" r="4.5"/>
+    <line x1="10" y1="10" x2="14" y2="14"/>
+  </svg>
+  <input id="search-input" type="text" placeholder="キャプチャ名・メモ・プロジェクト名で検索..." autofocus>
+  <span id="result-count"></span>
+</div>
+
+<div id="filter-bar">
+  <span class="filter-chip active" data-filter="all">すべて</span>
+  <span class="filter-chip" data-filter="name">キャプチャ名</span>
+  <span class="filter-chip" data-filter="memo">メモ</span>
+  <span class="filter-chip" data-filter="project">プロジェクト名</span>
+</div>
+
+<div id="results"></div>
+<div id="empty">
+  <svg width="40" height="40" viewBox="0 0 16 16" fill="none" stroke="#45475a" stroke-width="1" stroke-linecap="round">
+    <circle cx="6.5" cy="6.5" r="4.5"/>
+    <line x1="10" y1="10" x2="14" y2="14"/>
+  </svg>
+  キーワードを入力してください
+</div>
+
+<script>
+const { ipcRenderer } = require('electron');
+
+let allResults = [];
+let currentFilter = 'all';
+let query = '';
+
+// ハイライト
+function highlight(text, q) {
+  if (!q) return esc(text);
+  const idx = text.toLowerCase().indexOf(q.toLowerCase());
+  if (idx === -1) return esc(text);
+  return esc(text.slice(0, idx)) +
+    `<mark>${esc(text.slice(idx, idx + q.length))}</mark>` +
+    esc(text.slice(idx + q.length));
+}
+
+function esc(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function matchField(text, q) {
+  return text && text.toLowerCase().includes(q.toLowerCase());
+}
+
+function filterAndRender() {
+  const resultsEl = document.getElementById('results');
+  const emptyEl   = document.getElementById('empty');
+  const countEl   = document.getElementById('result-count');
+
+  if (!query) {
+    resultsEl.innerHTML = '';
+    emptyEl.style.display = 'flex';
+    emptyEl.querySelector('svg + *') || null;
+    emptyEl.lastChild.textContent = 'キーワードを入力してください';
+    countEl.textContent = '';
+    return;
+  }
+
+  const filtered = allResults.filter(r => {
+    if (currentFilter === 'name')    return matchField(r.capName, query);
+    if (currentFilter === 'memo')    return matchField(r.memo, query);
+    if (currentFilter === 'project') return matchField(r.projectName, query);
+    return matchField(r.capName, query) || matchField(r.memo, query) || matchField(r.projectName, query);
+  });
+
+  countEl.textContent = filtered.length ? `${filtered.length} 件` : '';
+
+  if (filtered.length === 0) {
+    resultsEl.innerHTML = '';
+    emptyEl.style.display = 'flex';
+    emptyEl.lastChild.textContent = '一致する結果がありません';
+    return;
+  }
+
+  emptyEl.style.display = 'none';
+  resultsEl.innerHTML = '';
+
+  filtered.forEach(r => {
+    const item = document.createElement('div');
+    item.className = 'result-item';
+
+    const matchedMemo = matchField(r.memo, query) ? r.memo : null;
+    const memoHtml = matchedMemo
+      ? `<div class="result-memo">${highlight(matchedMemo, query)}</div>`
+      : (r.memo ? `<div class="result-memo">${esc(r.memo)}</div>` : '');
+
+    item.innerHTML = `
+      <img class="result-thumb" src="" data-path="${esc(r.filePath)}" alt="">
+      <div class="result-body">
+        <div class="result-name">${highlight(r.capName, query)}</div>
+        <div class="result-meta">
+          <span class="proj-tag">${highlight(r.projectName, query)}</span>
+          ${new Date(r.createdAt).toLocaleDateString('ja-JP', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })}
+        </div>
+        ${memoHtml}
+      </div>
+      <svg class="result-arrow" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="4" y1="8" x2="12" y2="8"/><polyline points="9,5 12,8 9,11"/></svg>
+    `;
+
+    // サムネイル非同期ロード
+    ipcRenderer.invoke('pm-read-image', r.filePath).then(url => {
+      if (url) item.querySelector('.result-thumb').src = url;
+    });
+
+    item.addEventListener('click', () => {
+      ipcRenderer.send('search-open-project', { pid: r.projectId });
+    });
+
+    resultsEl.appendChild(item);
+  });
+}
+
+// 検索実行（デバウンス）
+let debounceTimer = null;
+document.getElementById('search-input').addEventListener('input', e => {
+  query = e.target.value.trim();
+  clearTimeout(debounceTimer);
+  if (!query) { allResults = []; filterAndRender(); return; }
+  debounceTimer = setTimeout(async () => {
+    allResults = await ipcRenderer.invoke('search-captures', query);
+    filterAndRender();
+  }, 200);
+});
+
+// フィルターチップ
+document.getElementById('filter-bar').addEventListener('click', e => {
+  const chip = e.target.closest('.filter-chip');
+  if (!chip) return;
+  document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+  chip.classList.add('active');
+  currentFilter = chip.dataset.filter;
+  filterAndRender();
+});
+</script>
+</body>
+</html>

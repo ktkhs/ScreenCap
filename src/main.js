@@ -5,6 +5,7 @@ require('@electron/remote/main').initialize();
 
 let mainWindow = null;
 let tray = null;
+let searchWindow = null;
 let selectorWindows = [];
 let editorWindow = null;
 let selectionStart = null;
@@ -52,6 +53,7 @@ function registerHotkeys() {
     showMainWindow();
     openProjectManager();
   });
+  globalShortcut.register('CommandOrControl+Shift+F', () => openSearchWindow());
 }
 
 function getDisplayLayout() {
@@ -519,6 +521,69 @@ ipcMain.on('pm-open-in-editor', async (e, filePath) => {
   } catch {}
 });
 
+function openSearchWindow() {
+  if (searchWindow && !searchWindow.isDestroyed()) {
+    searchWindow.focus();
+    return;
+  }
+  searchWindow = new BrowserWindow({
+    width: 640, height: 520, minWidth: 400, minHeight: 300,
+    webPreferences: { nodeIntegration: true, contextIsolation: false },
+    title: 'ScreenCap - 検索',
+    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+  });
+  searchWindow.loadFile(path.join(__dirname, 'renderer', 'search.html'));
+  searchWindow.on('closed', () => { searchWindow = null; });
+}
+
+ipcMain.handle('search-captures', async (e, query) => {
+  const q = query.toLowerCase();
+  const projects = await loadProjects();
+  const results = [];
+  await Promise.all(projects.map(async proj => {
+    const captures = await loadCaptures(proj.id);
+    captures.forEach(cap => {
+      const matchName    = cap.name && cap.name.toLowerCase().includes(q);
+      const matchMemo    = cap.memo && cap.memo.toLowerCase().includes(q);
+      const matchProject = proj.name.toLowerCase().includes(q);
+      if (matchName || matchMemo || matchProject) {
+        results.push({
+          projectId:   proj.id,
+          projectName: proj.name,
+          capId:       cap.id,
+          capName:     cap.name,
+          memo:        cap.memo || '',
+          createdAt:   cap.createdAt,
+          filePath:    path.join(projectDir(proj.id), cap.filename),
+        });
+      }
+    });
+  }));
+  // 新しい順にソート
+  results.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  return results;
+});
+
+ipcMain.on('search-open-project', (e, { pid }) => {
+  openProjectManager();
+  // プロジェクトマネージャーが読み込み完了してから選択を通知
+  const send = () => {
+    if (projectManagerWindow && !projectManagerWindow.isDestroyed()) {
+      projectManagerWindow.webContents.send('select-project', pid);
+    }
+  };
+  if (projectManagerWindow && !projectManagerWindow.isDestroyed()) {
+    // すでに開いていれば即送信
+    projectManagerWindow.focus();
+    setTimeout(send, 100);
+  } else {
+    // 新規オープンの場合はロード完了を待つ
+    const onReady = () => { send(); projectManagerWindow.webContents.off('did-finish-load', onReady); };
+    projectManagerWindow.webContents.on('did-finish-load', onReady);
+  }
+  if (searchWindow && !searchWindow.isDestroyed()) searchWindow.close();
+});
+
 function openProjectManager() {
   if (projectManagerWindow && !projectManagerWindow.isDestroyed()) {
     projectManagerWindow.focus(); return;
@@ -534,6 +599,7 @@ function openProjectManager() {
 }
 
 ipcMain.on('open-project-manager', () => openProjectManager());
+ipcMain.on('open-search-window', () => openSearchWindow());
 
 // エディタからプロジェクトに保存した後、プロジェクトマネージャを更新
 ipcMain.handle('pm-get-project-list-for-editor', async () => loadProjects());
@@ -604,6 +670,11 @@ function createTray() {
         showMainWindow();
         openProjectManager();
       },
+    },
+    {
+      label: '検索',
+      accelerator: 'CommandOrControl+Shift+F',
+      click: () => openSearchWindow(),
     },
     { type: 'separator' },
     {
