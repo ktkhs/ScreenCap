@@ -1,7 +1,87 @@
 const { app, BrowserWindow, globalShortcut, ipcMain, screen, clipboard, nativeImage, dialog, desktopCapturer, systemPreferences, shell, Tray, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const Database = require('better-sqlite3');
 require('@electron/remote/main').initialize();
+
+// ---- SQLite 検索インデックス ----
+let db = null;
+
+function initDb(dbPath) {
+  db = new Database(dbPath);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS captures (
+      cap_id       TEXT PRIMARY KEY,
+      project_id   TEXT NOT NULL,
+      project_name TEXT NOT NULL,
+      cap_name     TEXT NOT NULL DEFAULT '',
+      memo         TEXT NOT NULL DEFAULT '',
+      filename     TEXT NOT NULL DEFAULT '',
+      created_at   TEXT NOT NULL DEFAULT ''
+    );
+    CREATE INDEX IF NOT EXISTS idx_project ON captures(project_id);
+  `);
+}
+
+const dbInsert = () => db.prepare(`
+  INSERT OR REPLACE INTO captures (cap_id, project_id, project_name, cap_name, memo, filename, created_at)
+  VALUES (@cap_id, @project_id, @project_name, @cap_name, @memo, @filename, @created_at)
+`);
+
+function dbUpsert(row) {
+  dbInsert().run(row);
+}
+
+function dbDeleteCapture(cid) {
+  db.prepare('DELETE FROM captures WHERE cap_id = ?').run(cid);
+}
+
+function dbDeleteProject(pid) {
+  db.prepare('DELETE FROM captures WHERE project_id = ?').run(pid);
+}
+
+function dbUpdateCapName(cid, name) {
+  db.prepare('UPDATE captures SET cap_name = ? WHERE cap_id = ?').run(name, cid);
+}
+
+function dbUpdateMemo(cid, memo) {
+  db.prepare('UPDATE captures SET memo = ? WHERE cap_id = ?').run(memo, cid);
+}
+
+function dbUpdateProjectName(pid, name) {
+  db.prepare('UPDATE captures SET project_name = ? WHERE project_id = ?').run(name, pid);
+}
+
+function dbSearch(query) {
+  const q = `%${query}%`;
+  return db.prepare(`
+    SELECT * FROM captures
+    WHERE cap_name LIKE ? OR memo LIKE ? OR project_name LIKE ?
+    ORDER BY created_at DESC
+    LIMIT 200
+  `).all(q, q, q);
+}
+
+async function rebuildIndex() {
+  const projects = await loadProjects();
+  const insert = dbInsert();
+  const insertMany = db.transaction(rows => { for (const r of rows) insert.run(r); });
+  const rows = [];
+  for (const proj of projects) {
+    const captures = await loadCaptures(proj.id);
+    for (const cap of captures) {
+      rows.push({
+        cap_id: cap.id, project_id: proj.id, project_name: proj.name,
+        cap_name: cap.name || '', memo: cap.memo || '',
+        filename: cap.filename || '', created_at: cap.createdAt || '',
+      });
+    }
+  }
+  // 既存データを全削除して再構築
+  db.prepare('DELETE FROM captures').run();
+  insertMany(rows);
+  console.log(`[ScreenCap] Search index rebuilt: ${rows.length} captures`);
+}
 
 let mainWindow = null;
 let tray = null;
@@ -339,13 +419,14 @@ ipcMain.handle('pm-create-project', async (e, name) => {
 ipcMain.handle('pm-rename-project', async (e, { id, name }) => {
   const list = await loadProjects();
   const p = list.find(x => x.id === id);
-  if (p) { p.name = name; await saveProjectsMeta(list); }
+  if (p) { p.name = name; await saveProjectsMeta(list); dbUpdateProjectName(id, name); }
 });
 
 ipcMain.handle('pm-delete-project', async (e, id) => {
   await saveProjectsMeta((await loadProjects()).filter(x => x.id !== id));
   const dir = projectDir(id);
   try { await fs.promises.rm(dir, { recursive: true }); } catch {}
+  dbDeleteProject(id);
 });
 
 ipcMain.handle('pm-get-captures', async (e, pid) => {
@@ -356,14 +437,19 @@ ipcMain.handle('pm-get-captures', async (e, pid) => {
 });
 
 ipcMain.handle('pm-save-capture', async (e, { pid, dataUrl, name }) => {
+  const projects = await loadProjects();
+  const proj = projects.find(p => p.id === pid);
   const list = await loadCaptures(pid);
   const id = `cap_${Date.now()}`;
   const filename = `${id}.png`;
+  const capName = name || `capture-${formatDatetime()}`;
+  const createdAt = new Date().toISOString();
   const buf = Buffer.from(dataUrl.replace(/^data:image\/\w+;base64,/, ''), 'base64');
   await fs.promises.mkdir(projectDir(pid), { recursive: true });
   await fs.promises.writeFile(path.join(projectDir(pid), filename), buf);
-  list.push({ id, name: name || `capture-${formatDatetime()}`, filename, createdAt: new Date().toISOString() });
+  list.push({ id, name: capName, filename, createdAt });
   await saveCaptures(pid, list);
+  dbUpsert({ cap_id: id, project_id: pid, project_name: proj ? proj.name : '', cap_name: capName, memo: '', filename, created_at: createdAt });
   if (projectManagerWindow && !projectManagerWindow.isDestroyed()) {
     projectManagerWindow.webContents.send('pm-refresh');
   }
@@ -377,18 +463,19 @@ ipcMain.handle('pm-delete-capture', async (e, { pid, cid }) => {
     try { await fs.promises.unlink(path.join(projectDir(pid), cap.filename)); } catch {}
   }
   await saveCaptures(pid, list.filter(c => c.id !== cid));
+  dbDeleteCapture(cid);
 });
 
 ipcMain.handle('pm-rename-capture', async (e, { pid, cid, name }) => {
   const list = await loadCaptures(pid);
   const cap = list.find(c => c.id === cid);
-  if (cap) { cap.name = name; await saveCaptures(pid, list); }
+  if (cap) { cap.name = name; await saveCaptures(pid, list); dbUpdateCapName(cid, name); }
 });
 
 ipcMain.handle('pm-save-memo', async (e, { pid, cid, memo }) => {
   const list = await loadCaptures(pid);
   const cap = list.find(c => c.id === cid);
-  if (cap) { cap.memo = memo; await saveCaptures(pid, list); }
+  if (cap) { cap.memo = memo; await saveCaptures(pid, list); dbUpdateMemo(cid, memo); }
 });
 
 function treeFile(pid) { return path.join(projectDir(pid), 'tree.json'); }
@@ -501,6 +588,14 @@ ipcMain.handle('pm-import-project', async () => {
     await saveCaptures(newId, captures);
     await saveTree(newId, tree);
 
+    // 検索インデックスに追加
+    const insertMany = db.transaction(rows => { const ins = dbInsert(); for (const r of rows) ins.run(r); });
+    insertMany(captures.map(cap => ({
+      cap_id: cap.id, project_id: newId, project_name: projMeta.name,
+      cap_name: cap.name || '', memo: cap.memo || '',
+      filename: cap.filename || '', created_at: cap.createdAt || '',
+    })));
+
     return { ok: true, id: newId, name: projMeta.name };
   } catch (err) {
     return { ok: false, error: err.message };
@@ -536,32 +631,16 @@ function openSearchWindow() {
   searchWindow.on('closed', () => { searchWindow = null; });
 }
 
-ipcMain.handle('search-captures', async (e, query) => {
-  const q = query.toLowerCase();
-  const projects = await loadProjects();
-  const results = [];
-  await Promise.all(projects.map(async proj => {
-    const captures = await loadCaptures(proj.id);
-    captures.forEach(cap => {
-      const matchName    = cap.name && cap.name.toLowerCase().includes(q);
-      const matchMemo    = cap.memo && cap.memo.toLowerCase().includes(q);
-      const matchProject = proj.name.toLowerCase().includes(q);
-      if (matchName || matchMemo || matchProject) {
-        results.push({
-          projectId:   proj.id,
-          projectName: proj.name,
-          capId:       cap.id,
-          capName:     cap.name,
-          memo:        cap.memo || '',
-          createdAt:   cap.createdAt,
-          filePath:    path.join(projectDir(proj.id), cap.filename),
-        });
-      }
-    });
+ipcMain.handle('search-captures', (e, query) => {
+  return dbSearch(query).map(row => ({
+    projectId:   row.project_id,
+    projectName: row.project_name,
+    capId:       row.cap_id,
+    capName:     row.cap_name,
+    memo:        row.memo,
+    createdAt:   row.created_at,
+    filePath:    path.join(projectDir(row.project_id), row.filename),
   }));
-  // 新しい順にソート
-  results.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  return results;
 });
 
 ipcMain.on('search-open-project', (e, { pid, cid }) => {
@@ -702,9 +781,11 @@ function showMainWindow() {
 
 // ---- アプリライフサイクル ----
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   dataDir = path.join(app.getPath('userData'), 'screencap');
   fs.mkdirSync(dataDir, { recursive: true });
+  initDb(path.join(dataDir, 'search.db'));
+  await rebuildIndex();
   createMainWindow();
   createTray();
   registerHotkeys();
