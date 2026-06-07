@@ -746,8 +746,8 @@ document.getElementById('btn-arrange').addEventListener('click', () => {
     levels.forEach(lv => {
       byLevel[lv].forEach((id, i) => {
         treeData.nodes[id] = {
-          x: PAD + i * (NODE_W + GAP_X),
-          y: PAD + lv * (NODE_H + GAP_Y),
+          x: PAD + lv * (NODE_W + GAP_X),
+          y: PAD + i * (NODE_H + GAP_Y),
         };
       });
     });
