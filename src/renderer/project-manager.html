@@ -204,7 +204,16 @@ body {
   line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-all;
+  outline: none;
+  border-radius: 5px;
+  padding: 4px 6px;
+  min-height: 24px;
+  cursor: text;
+  transition: background 0.15s;
 }
+#preview-memo:hover { background: rgba(255,255,255,0.04); }
+#preview-memo:focus { background: #1e1e2e; box-shadow: 0 0 0 1px #585b70; }
+#preview-memo:empty::before { content: 'メモを入力...'; color: #45475a; pointer-events: none; }
 #preview-actions {
   padding: 10px 14px;
   border-top: 1px solid #313244;
@@ -495,7 +504,7 @@ body {
         <div id="preview-name"></div>
         <div id="preview-date"></div>
         <div id="preview-memo-label" style="display:none"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" style="vertical-align:middle"><rect x="2" y="1" width="12" height="14" rx="1"/><line x1="5" y1="5" x2="11" y2="5"/><line x1="5" y1="8" x2="11" y2="8"/><line x1="5" y1="11" x2="8" y2="11"/></svg> メモ</div>
-        <div id="preview-memo"></div>
+        <div id="preview-memo" contenteditable="true" spellcheck="false"></div>
       </div>
       <div id="preview-actions">
         <button class="preview-btn primary" id="preview-btn-edit"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><path d="M11.5 2.5l2 2-8 8-3 0.5 0.5-3z"/><line x1="9.5" y1="4.5" x2="11.5" y2="6.5"/></svg> エディタで開く</button>
@@ -1088,25 +1097,54 @@ function showPreview(cap, dataUrl) {
 
   const memoLabel = document.getElementById('preview-memo-label');
   const memoEl = document.getElementById('preview-memo');
-  if (cap.memo) {
-    memoLabel.style.display = '';
-    memoEl.textContent = cap.memo;
-  } else {
-    memoLabel.style.display = 'none';
-    memoEl.textContent = '';
-  }
+  memoLabel.style.display = '';
+  memoEl.textContent = cap.memo || '';
+
+  // メモ直接編集：前のリスナーを解除して付け直す
+  const newMemoEl = memoEl.cloneNode(true);
+  memoEl.parentNode.replaceChild(newMemoEl, memoEl);
+
+  newMemoEl.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      newMemoEl.blur();
+    }
+  });
+
+  newMemoEl.addEventListener('blur', async () => {
+    const newMemo = newMemoEl.textContent.trim();
+    if (newMemo === (cap.memo || '').trim()) return;
+    cap.memo = newMemo || '';
+    await ipcRenderer.invoke('pm-save-memo', { pid: currentProjectId, cid: cap.id, memo: cap.memo });
+    // グリッドカードのバッジ更新
+    const card = document.querySelector(`.capture-card[data-id="${cap.id}"]`);
+    if (card) {
+      const badge = card.querySelector('.cap-memo-badge');
+      if (cap.memo) {
+        if (badge) badge.textContent = cap.memo;
+        else {
+          const b = document.createElement('div');
+          b.className = 'cap-memo-badge';
+          b.title = cap.memo;
+          b.innerHTML = `${IC.memo} ${esc(cap.memo)}`;
+          card.querySelector('.card-body').appendChild(b);
+        }
+      } else if (badge) badge.remove();
+    }
+    // ツリーノードのメモ更新
+    const node = document.querySelector(`.tree-node[data-id="${cap.id}"] .node-memo`);
+    if (node) {
+      node.textContent = cap.memo;
+      node.classList.toggle('has-memo', !!cap.memo);
+    }
+  });
 
   // ボタンのイベントを毎回張り替え
   const btnEdit = document.getElementById('preview-btn-edit');
   const btnMemo = document.getElementById('preview-btn-memo');
   const btnDel  = document.getElementById('preview-btn-delete');
+  btnMemo.style.display = 'none';
   btnEdit.onclick = () => ipcRenderer.send('pm-open-in-editor', cap.filePath);
-  btnMemo.onclick = async () => {
-    await showMemoModal(cap);
-    // メモ更新後にキャプチャを再取得してプレビューを更新
-    const updated = treeCaptures.find(c => c.id === cap.id);
-    if (updated) showPreview(updated, document.getElementById('preview-img').src);
-  };
   btnDel.onclick = async () => {
     const ok = await showConfirmModal(`「${cap.name}」を削除しますか？`);
     if (!ok) return;
