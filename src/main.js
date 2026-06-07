@@ -349,6 +349,9 @@ ipcMain.handle('pm-save-capture', async (e, { pid, dataUrl, name }) => {
   await fs.promises.writeFile(path.join(projectDir(pid), filename), buf);
   list.push({ id, name: name || `capture-${formatDatetime()}`, filename, createdAt: new Date().toISOString() });
   await saveCaptures(pid, list);
+  if (projectManagerWindow && !projectManagerWindow.isDestroyed()) {
+    projectManagerWindow.webContents.send('pm-refresh');
+  }
   return id;
 });
 
