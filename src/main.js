@@ -564,20 +564,17 @@ ipcMain.handle('search-captures', async (e, query) => {
   return results;
 });
 
-ipcMain.on('search-open-project', (e, { pid }) => {
+ipcMain.on('search-open-project', (e, { pid, cid }) => {
   openProjectManager();
-  // プロジェクトマネージャーが読み込み完了してから選択を通知
   const send = () => {
     if (projectManagerWindow && !projectManagerWindow.isDestroyed()) {
-      projectManagerWindow.webContents.send('select-project', pid);
+      projectManagerWindow.webContents.send('select-project', { pid, cid });
     }
   };
   if (projectManagerWindow && !projectManagerWindow.isDestroyed()) {
-    // すでに開いていれば即送信
     projectManagerWindow.focus();
     setTimeout(send, 100);
   } else {
-    // 新規オープンの場合はロード完了を待つ
     const onReady = () => { send(); projectManagerWindow.webContents.off('did-finish-load', onReady); };
     projectManagerWindow.webContents.on('did-finish-load', onReady);
   }

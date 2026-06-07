@@ -260,6 +260,15 @@ body {
 }
 .capture-card:hover { border-color: #6c7086; transform: translateY(-1px); }
 .capture-card.selected { border-color: #cba6f7; }
+.capture-card.search-highlight {
+  border-color: #89b4fa;
+  box-shadow: 0 0 0 3px rgba(137,180,250,0.4);
+  animation: search-pulse 2s ease-out forwards;
+}
+@keyframes search-pulse {
+  0%   { box-shadow: 0 0 0 3px rgba(137,180,250,0.6); }
+  100% { box-shadow: 0 0 0 3px rgba(137,180,250,0); border-color: #45475a; }
+}
 .capture-card .thumb {
   width: 100%;
   aspect-ratio: 4/3;
@@ -1255,8 +1264,24 @@ document.getElementById('btn-search').addEventListener('click', () => {
   ipcRenderer.send('open-search-window');
 });
 
-ipcRenderer.on('select-project', (e, pid) => {
-  selectProject(pid);
+ipcRenderer.on('select-project', async (e, { pid, cid }) => {
+  await selectProject(pid);
+  if (!cid) return;
+  // キャプチャ読み込み完了を少し待ってからハイライト
+  const highlight = () => {
+    const card = document.querySelector(`.capture-card[data-id="${cid}"]`);
+    if (!card) return;
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    card.classList.add('search-highlight');
+    setTimeout(() => card.classList.remove('search-highlight'), 2000);
+    // プレビューも表示
+    const cap = treeCaptures.find(c => c.id === cid);
+    if (cap) {
+      ipcRenderer.invoke('pm-read-image', cap.filePath).then(url => showPreview(cap, url));
+    }
+  };
+  // renderCaptures は非同期画像ロードのため少し待つ
+  setTimeout(highlight, 150);
 });
 
 // ---- Export / Import ----

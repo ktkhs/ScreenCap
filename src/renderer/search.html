@@ -278,7 +278,7 @@ function filterAndRender() {
     });
 
     item.addEventListener('click', () => {
-      ipcRenderer.send('search-open-project', { pid: r.projectId });
+      ipcRenderer.send('search-open-project', { pid: r.projectId, cid: r.capId });
     });
 
     resultsEl.appendChild(item);
